@@ -36,7 +36,7 @@ parser.add_argument('--seed', default=123)
 parser.add_argument('--gpuid', default=1, type=int)
 parser.add_argument('--resume', default=False, type=bool, help = 'Resume from the warmup checkpoint')
 parser.add_argument('--num_class', default=10, type=int)
-parser.add_argument('--data_path', default='./CNLL/data/CIFAR100', type=str, help='path to dataset')
+parser.add_argument('--data_path', default='./data/CIFAR100', type=str, help='path to dataset')
 parser.add_argument('--dataset', default='cifar100', type=str)
 args = parser.parse_args()
 
