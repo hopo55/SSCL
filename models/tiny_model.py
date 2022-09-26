@@ -297,16 +297,15 @@ class ResNet(nn.Module):
         logits = self.logits(out)
         return logits
 
-    def ood_logits(self, x, y):
-        self.last_ncm.fit_batch(x, y)
-        x = self.last_ncm.ood_predict(x)
-        return x
-
+    # update center
     def ood_forward(self, x, y):
         out = self.features(x)
-        logits = self.ood_logits(out, y)
-        return logits
+        self.last_ncm.fit_batch(out, y)
 
+    def ood_logits(self, x):
+        out = self.features(x)
+        logits = self.last_ncm.ood_predict(out)
+        return logits
 
 def Reduced_ResNet18(out_dim=100, nf=20, bias=True):
     # Reduced ResNet18 as in GEM MIR(note that nf=20).
