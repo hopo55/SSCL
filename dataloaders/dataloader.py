@@ -1,5 +1,6 @@
 import os
 import sys
+import torch
 import random
 import pickle
 import numpy as np
@@ -312,13 +313,6 @@ class iCIFAR10(data.Dataset):
             self.targets = np.concatenate([self.archive[s][1] for s in range(t+1)], axis=0)
 
         self.t = t
-        
-        print('*********')
-        print('training - ' + str(self.train))
-        print('labeled - ' + str(self.lab))
-        print('classes - ' + str(np.unique(self.targets)))
-        print('num data - ' + str(len(self.targets)))
-        print('*********')
 
         # for backup
         shuffle_indexes = np.arange(len(self.targets))
@@ -336,8 +330,8 @@ class iCIFAR10(data.Dataset):
             self.targets = []
 
             for k in range(self.num_classes):
+
                 # get indexes of dataset corresponding to k
-                # when does it use this?
                 locs = (np.asarray(self.targets_backup) == k).nonzero()[0]
                 num_k = len(locs)
 
@@ -492,3 +486,37 @@ class iCIFAR100(iCIFAR10):
         }
 
     
+class SSCLDataLoader(object):
+    def __init__(self, labeled_dset, unlabeled_dset):
+        self.labeled_dset = labeled_dset
+        self.unlabeled_dset = unlabeled_dset
+
+        self.labeled_iter = iter(self.labeled_dset)
+        self.unlabeled_iter = iter(self.unlabeled_dset)
+
+    def __iter__(self):
+        self.labeled_iter = iter(self.labeled_dset)
+        return self
+
+    def __len__(self):
+        return len(self.labeled_dset)
+
+    def __next__(self):
+        
+        # labeled
+        xl, yl, task = next(self.labeled_iter)
+        shuffle_idx = torch.randperm(len(yl), device=yl.device)
+        # xl, yl, task = [xl[k][shuffle_idx] for k in range(len(xl))], yl[shuffle_idx], task[shuffle_idx]
+        xl, yl, task = xl[shuffle_idx], yl[shuffle_idx], task[shuffle_idx]
+
+        # unlabeled
+        try:
+            xu, yul, _ = next(self.unlabeled_iter)
+        except:
+            self.unlabeled_iter = iter(self.unlabeled_dset)
+            xu, yul, _ = next(self.unlabeled_iter)
+        shuffle_idx = torch.randperm(len(yul), device=yul.device)
+        # xu, yul = [xu[k][shuffle_idx] for k in range(len(xu))], yul[shuffle_idx]
+        xu, yul = xu[shuffle_idx], yul[shuffle_idx]
+
+        return xl, yl, xu, yul, task

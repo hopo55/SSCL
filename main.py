@@ -5,6 +5,7 @@ import learners
 import dataloaders
 import numpy as np
 from dataloaders.utils import *
+from torch.utils.data import DataLoader
 
 def run(args):
     seed = args.seed
@@ -49,44 +50,97 @@ def run(args):
     train_transform = dataloaders.utils.get_transform(dataset=args.dataset)
     test_transform  = dataloaders.utils.get_transform(dataset=args.dataset)
     
+    # train_dataset = Dataset(args.dataroot, args.dataset, args.labeled_samples, args.unlabeled_task_samples, train=True, lab = True,
+    #                         download=True, transform=TransformK(train_transform, train_transform, 2), l_dist=args.l_dist, ul_dist=args.ul_dist,
+    #                         tasks=tasks, seed=seed, rand_split=args.rand_split, validation=args.validation)
     train_dataset = Dataset(args.dataroot, args.dataset, args.labeled_samples, args.unlabeled_task_samples, train=True, lab = True,
                             download=True, transform=train_transform, l_dist=args.l_dist, ul_dist=args.ul_dist,
-                            tasks=tasks, seed=seed, rand_split=args.rand_split, validation=args.validation, kfolds=args.repeat)
+                            tasks=tasks, seed=seed, rand_split=args.rand_split, validation=args.validation)                       
+    # train_dataset_ul = Dataset(args.dataroot, args.dataset, args.labeled_samples, args.unlabeled_task_samples, train=True, lab = False,
+    #                         download=True, transform=TransformK(train_transform, train_transform, 1), l_dist=args.l_dist, ul_dist=args.ul_dist,
+    #                         tasks=tasks, seed=seed, rand_split=args.rand_split, validation=args.validation)
     train_dataset_ul = Dataset(args.dataroot, args.dataset, args.labeled_samples, args.unlabeled_task_samples, train=True, lab = False,
                             download=True, transform=train_transform, l_dist=args.l_dist, ul_dist=args.ul_dist,
-                            tasks=tasks, seed=seed, rand_split=args.rand_split, validation=args.validation, kfolds=args.repeat)
+                            tasks=tasks, seed=seed, rand_split=args.rand_split, validation=args.validation)
     test_dataset  = Dataset(args.dataroot, args.dataset, train=False,
                             download=False, transform=test_transform, l_dist=args.l_dist, ul_dist=args.ul_dist,
-                            tasks=tasks, seed=seed, rand_split=args.rand_split, validation=args.validation, kfolds=args.repeat)
+                            tasks=tasks, seed=seed, rand_split=args.rand_split, validation=args.validation)
 
-    learner_config = {'num_classes': num_classes,}
+    learner_config = {'num_classes': num_classes,
+                      'model_type' : args.model_type,
+                      'model_name' : args.model_name,
+                      'epoch' : args.epoch,
+                      'lr' : args.lr,
+                      'momentum' : args.momentum,
+                      'weight_decay' : args.weight_decay,
+                     }
     learner = learners.__dict__[args.learner_type].__dict__[args.learner_name](learner_config)
-    learner.test()
 
     # in case tasks reset...
     tasks = train_dataset.tasks
     max_task = len(tasks)
-    print(max_task)
 
+    for i in range(max_task):
+        train_name = task_names[i]
+        print('======================', train_name, '=======================')
+
+        # load dataset for task
+        task = tasks_logits[i]
+        prev = sorted(set([k for task in tasks_logits[:i] for k in task]))
+        
+        train_dataset.load_dataset(prev, i, train=True)
+        train_dataset_ul.load_dataset(prev, i, train=True)
+        out_dim_add = len(task)
+
+        # load dataset with memory(coreset)
+        train_dataset.append_coreset(only=False)
+
+        # load dataloader
+        train_loader_l = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=False, num_workers=args.workers)
+        train_loader_ul = DataLoader(train_dataset_ul, batch_size=args.ul_batch_size, shuffle=True, drop_last=False, num_workers=args.workers)
+        train_loader = dataloaders.SSCLDataLoader(train_loader_l, train_loader_ul)
+
+        test_dataset.load_dataset(prev, i, train=False)
+        test_loader  = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, drop_last=False, num_workers=args.workers)
+        
+        # add valid class for classifier
+        model_save_dir = args.log_dir + '/models/task-'+task_names[i]+'/'
+        if not os.path.exists(model_save_dir): os.makedirs(model_save_dir)
+
+        learner.add_valid_output_dim(out_dim_add)
+        learner.learn_batch(train_loader, train_dataset, train_dataset_ul, model_save_dir, test_loader)
+
+
+        
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Semi-Supervised Continual Learning')
+
+    # Standard Args
     parser.add_argument('--seed', type=int, default=0, help='Set seed (default=0)')
     parser.add_argument('--dataset', type=str, default='CIFAR100', help="CIFAR10|CIFAR100")
+    parser.add_argument('--log_dir', type=str, default="outputs/out", help="Save experiments results in dir for future plotting!")
     parser.add_argument('--dataroot', type=str, default='data', help="The root folder of dataset or downloaded data")
-    # labeled_samples init value = 50000
-    parser.add_argument('--labeled_samples', type=int, default=10000, help='Number of labeled samples in ssl')
-    # unlabeled_task_samples init value = 0
-    parser.add_argument('--unlabeled_task_samples', type=int, default=-1, help='Number of unlabeled samples in each task in ssl')
+    parser.add_argument('--workers', type=int, default=8, help="#Thread for dataloader")
+    parser.add_argument('--model_type', type=str, default='tiny_model', help="The type tin_model of backbone network")
+    parser.add_argument('--model_name', type=str, default='Reduced_ResNet18', help="The name of actual model for the backbone")
+    parser.add_argument('--epoch', type=int, default=1)
+    parser.add_argument('--lr', type=float, default=0.1, help="Learning rate")
+    parser.add_argument('--momentum', type=float, default=0.9)
+    parser.add_argument('--weight_decay', type=float, default=5e-4)
+
+    # SSCL Args
     parser.add_argument('--l_dist', type=str, default='super', help="vanilla|super")
     parser.add_argument('--ul_dist', type=str, default=None, help="none|vanilla|super - if none, copy l dist")
     parser.add_argument('--rand_split', default=False, action='store_true', help="Randomize the classes in splits")
     parser.add_argument('--validation', default=False, action='store_true', help='Evaluate training dataset rather than testing data')
-    parser.add_argument('--repeat', type=int, default=1, help="Repeat the experiment N times")
-    # learner_type init value = 'default'
-    parser.add_argument('--learner_type', type=str, default='tiny_model', help="The type (filename) of learner")
+    parser.add_argument('--batch_size', type=int, default=64)
+    parser.add_argument('--learner_type', type=str, default='tiny_learner', help="The type (filename) of learner")
     parser.add_argument('--learner_name', type=str, default='SSCL', help="The class name of learner")
-    
+    parser.add_argument('--ul_batch_size', type=int, default=128)
+    parser.add_argument('--labeled_samples', type=int, default=10000, help='Number of labeled samples in ssl')
+    parser.add_argument('--unlabeled_task_samples', type=int, default=-1, help='Number of unlabeled samples in each task in ssl')
+
     args = parser.parse_args()
 
     run(args)
