@@ -119,7 +119,7 @@ if __name__ == '__main__':
     # Standard Args
     parser.add_argument('--seed', type=int, default=0, help='Set seed (default=0)')
     parser.add_argument('--dataset', type=str, default='CIFAR100', help="CIFAR10|CIFAR100")
-    parser.add_argument('--log_dir', type=str, default="outputs/out", help="Save experiments results in dir for future plotting!")
+    parser.add_argument('--log_dir', type=str, default="outputs", help="Save experiments results in dir for future plotting!")
     parser.add_argument('--dataroot', type=str, default='data', help="The root folder of dataset or downloaded data")
     parser.add_argument('--workers', type=int, default=8, help="#Thread for dataloader")
     parser.add_argument('--model_type', type=str, default='tiny_model', help="The type tin_model of backbone network")
@@ -134,10 +134,10 @@ if __name__ == '__main__':
     parser.add_argument('--ul_dist', type=str, default=None, help="none|vanilla|super - if none, copy l dist")
     parser.add_argument('--rand_split', default=False, action='store_true', help="Randomize the classes in splits")
     parser.add_argument('--validation', default=False, action='store_true', help='Evaluate training dataset rather than testing data')
-    parser.add_argument('--batch_size', type=int, default=64)
+    parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--learner_type', type=str, default='tiny_learner', help="The type (filename) of learner")
     parser.add_argument('--learner_name', type=str, default='SSCL', help="The class name of learner")
-    parser.add_argument('--ul_batch_size', type=int, default=128)
+    parser.add_argument('--ul_batch_size', type=int, default=32)
     parser.add_argument('--labeled_samples', type=int, default=10000, help='Number of labeled samples in ssl')
     parser.add_argument('--unlabeled_task_samples', type=int, default=-1, help='Number of unlabeled samples in each task in ssl')
 
