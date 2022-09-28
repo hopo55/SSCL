@@ -100,6 +100,7 @@ class iCIFAR10(data.Dataset):
         self.data = np.vstack(self.data).reshape(-1, 3, 32, 32)
         self.data = self.data.transpose((0, 2, 3, 1))  # convert to HWC
         self._load_meta()
+        
         self.num_classes = len(np.unique(self.targets))
 
         # resample tasks if not vanilla task
