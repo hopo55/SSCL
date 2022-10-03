@@ -32,12 +32,14 @@ class CIFAR10(VisionDataset):
         "md5": "5ff9c542aee3614f3951f8cda6e48888",
     }
 
-    def __init__(self, root: str, train: bool = True, transform: Optional[Callable] = None,
+    def __init__(self, root: str, train: bool = True, label: bool = True, num_label_data:int = 0, 
+                 class_type:str = "vanilla", transform: Optional[Callable] = None,
                  target_transform: Optional[Callable] = None, download: bool = False) -> None:
         
         super().__init__(root, transform=transform, target_transform=target_transform)
 
         self.train = train  # training set or test set
+        self.label = label
 
         if download:
             self.download()
@@ -73,6 +75,44 @@ class CIFAR10(VisionDataset):
         self.data = self.data.transpose((0, 2, 3, 1))  # convert to HWC
 
         self._load_meta()
+
+        max_num = int(len(self.targets) / (max(self.targets)+1))
+
+        if num_label_data == 0:
+            num_label_data = max_num
+        elif num_label_data < 0 or num_label_data >= max_num:
+            raise RuntimeError("num_data must be higher than 0 or num_data must be lower than number of dataset")
+
+        if self.label:
+            class_list = []
+            for idx in np.unique(self.targets):
+                class_index = np.where(self.targets == idx)[0]
+                class_list.extend(class_index[:num_label_data])
+
+            if class_type == 'vanilla':
+                self.data = self.data[class_list]
+                self.targets = [self.targets[k] for k in class_list]
+            else:
+                self.data = self.data[class_list]
+                self.targets = [self.course_targets[k] for k in class_list]
+        else:
+            class_list = []
+
+            if num_label_data == max_num:
+                raise RuntimeError("num_data must be lower than number of dataset")
+
+            for idx in np.unique(self.targets):
+                class_index = np.where(self.targets == idx)[0]
+                class_list.extend(class_index[num_label_data:])
+
+            if class_type == 'vanilla':
+                self.data = self.data[class_list]
+                self.targets = [self.targets[k] for k in class_list]
+            else:
+                self.data = self.data[class_list]
+                self.targets = [self.course_targets[k] for k in class_list]
+
+
 
     def _load_meta(self) -> None:
         path = os.path.join(self.root, self.base_folder, self.meta["filename"])

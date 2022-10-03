@@ -101,6 +101,7 @@ class iCIFAR10(data.Dataset):
         self.data = self.data.transpose((0, 2, 3, 1))  # convert to HWC
         self._load_meta()
         
+        # For SSCL
         self.num_classes = len(np.unique(self.targets))
 
         # resample tasks if not vanilla task
