@@ -77,14 +77,10 @@ def run(args):
         # load dataset for task
         task = tasks_logits[i]
         prev = sorted(set([k for task in tasks_logits[:i] for k in task]))
-        
+
         train_dataset.load_dataset(prev, i, train=True)
         train_dataset_ul.load_dataset(prev, i, train=True)
         out_dim_add = len(task)
-
-        '''
-        # load dataset with memory(coreset)
-        train_dataset.append_coreset(only=False)
 
         # load dataloader
         train_loader_l = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=False, num_workers=args.workers)
@@ -94,6 +90,7 @@ def run(args):
         test_dataset.load_dataset(prev, i, train=False)
         test_loader  = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, drop_last=False, num_workers=args.workers)
         
+        '''
         # add valid class for classifier
         model_save_dir = args.log_dir + '/models/task-'+task_names[i]+'/'
         if not os.path.exists(model_save_dir): os.makedirs(model_save_dir)
@@ -128,7 +125,7 @@ if __name__ == '__main__':
     parser.add_argument('--learner_type', type=str, default='tiny_learner', help="The type (filename) of learner")
     parser.add_argument('--learner_name', type=str, default='SSCL', help="The class name of learner")
     parser.add_argument('--ul_batch_size', type=int, default=32)
-    parser.add_argument('--labeled_samples', type=int, default=100, help='Number of labeled samples each task in ssl')
+    parser.add_argument('--labeled_samples', type=int, default=500, help='Number of labeled samples each task in ssl')
     parser.add_argument('--unlabeled_task_samples', type=int, default=-1, help='Number of unlabeled samples in each task in ssl')
 
     args = parser.parse_args()

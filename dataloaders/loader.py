@@ -40,6 +40,7 @@ class CIFAR10(VisionDataset):
 
         self.train = train  # training set or test set
         self.label = label
+        self.class_type = class_type
 
         if download:
             self.download()
@@ -52,10 +53,13 @@ class CIFAR10(VisionDataset):
         else:
             downloaded_list = self.test_list
 
-        self.data: Any = []
+        self.data = []
         self.targets = []
         self.course_targets = []
         self.tasks = []
+        self.class_list = []
+        self.current_data = []
+        self.current_targets = []
 
         # now load the picked numpy arrays
         for file_name, checksum in downloaded_list:
@@ -77,47 +81,29 @@ class CIFAR10(VisionDataset):
         self._load_meta()
 
         if self.train:
-            max_num = int(len(self.targets) / (max(self.targets)+1))
-
-            if num_label_data == 0:
-                num_label_data = max_num
-            elif num_label_data < 0 or num_label_data >= max_num:
-                raise RuntimeError("num_data must be higher than 0 or num_data must be lower than number of dataset")
-
             if self.label:
-                class_list = []
-                for idx in np.unique(self.targets):
-                    class_index = np.where(self.targets == idx)[0]
-                    class_list.extend(class_index[:num_label_data])
+                if self.class_type == 'vanilla':
+                    for idx in np.unique(self.targets):
+                        class_index = np.where(self.targets == idx)[0]
+                        self.class_list.append(class_index[:num_label_data])
 
-                if class_type == 'vanilla':
-                    self.data = self.data[class_list]
-                    self.targets = [self.targets[k] for k in class_list]
-                    tasks_list = range(max(self.targets)+1)
                     self.tasks.append(range(max(self.targets)))
                 else:
-                    self.data = self.data[class_list]
-                    self.targets = [self.course_targets[k] for k in class_list]
-                    
-                    tasks_list = range(max(self.targets)+1)
+                    for idx in np.unique(self.course_targets):
+                        class_index = np.where(self.course_targets == idx)[0]
+                        self.class_list.append(class_index[:num_label_data])
+
+                    tasks_list = range(max(self.course_targets)+1)
                     [self.tasks.append(k) for k in tasks_list]
             else:
-                class_list = []
-
-                if num_label_data == max_num:
-                    raise RuntimeError("num_data must be lower than number of dataset")
-
-                for idx in np.unique(self.targets):
-                    class_index = np.where(self.targets == idx)[0]
-                    class_list.extend(class_index[num_label_data:])
-
-                if class_type == 'vanilla':
-                    self.data = self.data[class_list]
-                    self.targets = [self.targets[k] for k in class_list]
+                if self.class_type == 'vanilla':
+                    for idx in np.unique(self.targets):
+                        class_index = np.where(self.targets == idx)[0]
+                        self.class_list.append(class_index[num_label_data:])
                 else:
-                    self.data = self.data[class_list]
-                    self.targets = [self.course_targets[k] for k in class_list]
-
+                    for idx in np.unique(self.course_targets):
+                        class_index = np.where(self.course_targets == idx)[0]
+                        self.class_list.append(class_index[num_label_data:])
 
 
     def _load_meta(self) -> None:
@@ -129,8 +115,10 @@ class CIFAR10(VisionDataset):
             self.classes = data[self.meta["key"]]
         self.class_to_idx = {_class: i for i, _class in enumerate(self.classes)}
 
+
     def __getitem__(self, index: int) -> Tuple[Any, Any]:
-        img, target = self.data[index], self.targets[index]
+        # img, target = self.data[index], self.targets[index]
+        img, target = self.current_data[index], self.current_targets[index]
 
         # doing this so that it is consistent with all other datasets
         # to return a PIL Image
@@ -144,8 +132,10 @@ class CIFAR10(VisionDataset):
 
         return img, target
     
+
     def __len__(self) -> int:
         return len(self.data)
+
 
     def _check_integrity(self) -> bool:
         root = self.root
@@ -156,17 +146,30 @@ class CIFAR10(VisionDataset):
                 return False
         return True
 
+
     def download(self) -> None:
         if self._check_integrity():
             print("Files already downloaded and verified")
             return
         download_and_extract_archive(self.url, self.root, filename=self.filename, md5=self.tgz_md5)
 
+
     def load_dataset(self, prev, t, train=True):
         if train:
             if self.label:
-                pass
-                # self.data, self.targets = 
+                if self.class_type == 'vanilla':
+                    self.current_data = self.data[self.class_list[t]]
+                    self.current_targets = [self.targets[k] for k in self.class_list[t]]
+                else:
+                    self.current_data = self.data[self.class_list[t]]
+                    self.current_targets = [self.course_targets[k] for k in self.class_list[t]]
+            else:
+                if self.class_type == 'vanilla':
+                    self.current_data = self.data[self.class_list[t]]
+                    self.current_targets = [self.targets[k] for k in self.class_list[t]]
+                else:
+                    self.current_data = self.data[self.class_list[t]]
+                    self.current_targets = [self.course_targets[k] for k in self.class_list[t]]
 
 
 class CIFAR100(CIFAR10):
