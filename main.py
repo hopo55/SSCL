@@ -16,10 +16,10 @@ def run(args):
     torch.backends.cudnn.deterministic=True
 
     if args.dataset == 'CIFAR10':
-        Dataset = dataloaders.iCIFAR10
+        Dataset = dataloaders.CIFAR10
         num_classes = 10
     elif args.dataset == 'CIFAR100':
-        Dataset = dataloaders.iCIFAR100
+        Dataset = dataloaders.CIFAR100
         num_classes = 100
     else:
         print('Dataset does not select.')
@@ -50,21 +50,11 @@ def run(args):
     train_transform = dataloaders.utils.get_transform(dataset=args.dataset)
     test_transform  = dataloaders.utils.get_transform(dataset=args.dataset)
     
-    # train_dataset = Dataset(args.dataroot, args.dataset, args.labeled_samples, args.unlabeled_task_samples, train=True, lab = True,
-    #                         download=True, transform=TransformK(train_transform, train_transform, 2), l_dist=args.l_dist, ul_dist=args.ul_dist,
-    #                         tasks=tasks, seed=seed, rand_split=args.rand_split, validation=args.validation)
-    train_dataset = Dataset(args.dataroot, args.dataset, args.labeled_samples, args.unlabeled_task_samples, train=True, lab = True,
-                            download=True, transform=train_transform, l_dist=args.l_dist, ul_dist=args.ul_dist,
-                            tasks=tasks, seed=seed, rand_split=args.rand_split, validation=args.validation)                       
-    # train_dataset_ul = Dataset(args.dataroot, args.dataset, args.labeled_samples, args.unlabeled_task_samples, train=True, lab = False,
-    #                         download=True, transform=TransformK(train_transform, train_transform, 1), l_dist=args.l_dist, ul_dist=args.ul_dist,
-    #                         tasks=tasks, seed=seed, rand_split=args.rand_split, validation=args.validation)
-    train_dataset_ul = Dataset(args.dataroot, args.dataset, args.labeled_samples, args.unlabeled_task_samples, train=True, lab = False,
-                            download=True, transform=train_transform, l_dist=args.l_dist, ul_dist=args.ul_dist,
-                            tasks=tasks, seed=seed, rand_split=args.rand_split, validation=args.validation)
-    test_dataset  = Dataset(args.dataroot, args.dataset, train=False,
-                            download=False, transform=test_transform, l_dist=args.l_dist, ul_dist=args.ul_dist,
-                            tasks=tasks, seed=seed, rand_split=args.rand_split, validation=args.validation)
+    train_dataset = Dataset(args.dataroot, train=True, label=True, num_label_data=args.labeled_samples, class_type=args.class_type, transform=train_transform, download=True)
+
+    train_dataset_ul = Dataset(args.dataroot, train=True, label=False, num_label_data=args.labeled_samples, class_type=args.class_type, transform=train_transform, download=True)
+
+    test_dataset  = Dataset(args.dataroot, train=False, transform=train_transform, download=True)
 
     learner_config = {'num_classes': num_classes,
                       'model_type' : args.model_type,
@@ -92,6 +82,7 @@ def run(args):
         train_dataset_ul.load_dataset(prev, i, train=True)
         out_dim_add = len(task)
 
+        '''
         # load dataset with memory(coreset)
         train_dataset.append_coreset(only=False)
 
@@ -109,7 +100,7 @@ def run(args):
 
         learner.add_valid_output_dim(out_dim_add)
         learner.learn_batch(train_loader, train_dataset, train_dataset_ul, model_save_dir, test_loader)
-
+        '''
 
         
 
@@ -130,15 +121,14 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', type=float, default=5e-4)
 
     # SSCL Args
-    parser.add_argument('--l_dist', type=str, default='super', help="vanilla|super")
-    parser.add_argument('--ul_dist', type=str, default=None, help="none|vanilla|super - if none, copy l dist")
+    parser.add_argument('--class_type', type=str, default='super', help="vanilla|super")
     parser.add_argument('--rand_split', default=False, action='store_true', help="Randomize the classes in splits")
     parser.add_argument('--validation', default=False, action='store_true', help='Evaluate training dataset rather than testing data')
     parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--learner_type', type=str, default='tiny_learner', help="The type (filename) of learner")
     parser.add_argument('--learner_name', type=str, default='SSCL', help="The class name of learner")
     parser.add_argument('--ul_batch_size', type=int, default=32)
-    parser.add_argument('--labeled_samples', type=int, default=10000, help='Number of labeled samples in ssl')
+    parser.add_argument('--labeled_samples', type=int, default=100, help='Number of labeled samples each task in ssl')
     parser.add_argument('--unlabeled_task_samples', type=int, default=-1, help='Number of unlabeled samples in each task in ssl')
 
     args = parser.parse_args()
