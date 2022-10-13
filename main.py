@@ -1,6 +1,7 @@
 import torch
 import random
 import argparse
+from dataloaders import loader
 import learners
 import dataloaders
 import numpy as np
@@ -54,7 +55,7 @@ def run(args):
 
     train_dataset_ul = Dataset(args.dataroot, train=True, label=False, num_label_data=args.labeled_samples, class_type=args.class_type, transform=train_transform, download=True)
 
-    test_dataset  = Dataset(args.dataroot, train=False, transform=train_transform, download=True)
+    test_dataset  = Dataset(args.dataroot, train=False, class_type=args.class_type, transform=train_transform, download=True)
 
     learner_config = {'num_classes': num_classes,
                       'model_type' : args.model_type,
@@ -85,19 +86,17 @@ def run(args):
         # load dataloader
         train_loader_l = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=False, num_workers=args.workers)
         train_loader_ul = DataLoader(train_dataset_ul, batch_size=args.ul_batch_size, shuffle=True, drop_last=False, num_workers=args.workers)
-        train_loader = dataloaders.SSCLDataLoader(train_loader_l, train_loader_ul)
+        train_loader = loader.SSCLDataLoader(train_loader_l, train_loader_ul)
 
         test_dataset.load_dataset(prev, i, train=False)
         test_loader  = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, drop_last=False, num_workers=args.workers)
         
-        '''
         # add valid class for classifier
         model_save_dir = args.log_dir + '/models/task-'+task_names[i]+'/'
         if not os.path.exists(model_save_dir): os.makedirs(model_save_dir)
 
         learner.add_valid_output_dim(out_dim_add)
         learner.learn_batch(train_loader, train_dataset, train_dataset_ul, model_save_dir, test_loader)
-        '''
 
         
 

@@ -5,6 +5,7 @@ from typing import Any, Callable, Optional, Tuple
 import numpy as np
 from PIL import Image
 
+import torch
 from torchvision.datasets.utils import check_integrity, download_and_extract_archive
 from torchvision.datasets import VisionDataset
 
@@ -104,6 +105,15 @@ class CIFAR10(VisionDataset):
                     for idx in np.unique(self.course_targets):
                         class_index = np.where(self.course_targets == idx)[0]
                         self.class_list.append(class_index[num_label_data:])
+        else:
+            if self.class_type == 'vanilla':
+                for idx in np.unique(self.targets):
+                    class_index = np.where(self.targets == idx)[0]
+                    self.class_list.append(class_index)
+            else:
+                for idx in np.unique(self.course_targets):
+                    class_index = np.where(self.course_targets == idx)[0]
+                    self.class_list.append(class_index)
 
 
     def _load_meta(self) -> None:
@@ -170,6 +180,13 @@ class CIFAR10(VisionDataset):
                 else:
                     self.current_data = self.data[self.class_list[t]]
                     self.current_targets = [self.course_targets[k] for k in self.class_list[t]]
+        else:
+            if self.class_type == 'vanilla':
+                self.current_data = self.data[self.class_list[t]]
+                self.current_targets = [self.targets[k] for k in self.class_list[t]]
+            else:
+                self.current_data = self.data[self.class_list[t]]
+                self.current_targets = [self.course_targets[k] for k in self.class_list[t]]
 
 
 class CIFAR100(CIFAR10):
@@ -194,3 +211,39 @@ class CIFAR100(CIFAR10):
         "key": "fine_label_names",
         "md5": "7973b15100ade9c7d40fb424638fde48",
     }
+
+
+class SSCLDataLoader(object):
+    def __init__(self, labeled_dset, unlabeled_dset):
+        self.labeled_dset = labeled_dset
+        self.unlabeled_dset = unlabeled_dset
+
+        self.labeled_iter = iter(self.labeled_dset)
+        self.unlabeled_iter = iter(self.unlabeled_dset)
+
+    def __iter__(self):
+        self.labeled_iter = iter(self.labeled_dset)
+        return self
+
+    def __len__(self):
+        return len(self.labeled_dset)
+
+    def __next__(self):
+        
+        # labeled
+        xl, yl, task = next(self.labeled_iter)
+        shuffle_idx = torch.randperm(len(yl), device=yl.device)
+        # xl, yl, task = [xl[k][shuffle_idx] for k in range(len(xl))], yl[shuffle_idx], task[shuffle_idx]
+        xl, yl, task = xl[shuffle_idx], yl[shuffle_idx], task[shuffle_idx]
+
+        # unlabeled
+        try:
+            xu, yul, _ = next(self.unlabeled_iter)
+        except:
+            self.unlabeled_iter = iter(self.unlabeled_dset)
+            xu, yul, _ = next(self.unlabeled_iter)
+        shuffle_idx = torch.randperm(len(yul), device=yul.device)
+        # xu, yul = [xu[k][shuffle_idx] for k in range(len(xu))], yul[shuffle_idx]
+        xu, yul = xu[shuffle_idx], yul[shuffle_idx]
+
+        return xl, yl, xu, yul, task
