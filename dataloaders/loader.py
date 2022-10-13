@@ -229,7 +229,6 @@ class SSCLDataLoader(object):
         return len(self.labeled_dset)
 
     def __next__(self):
-        
         # labeled
         xl, yl, task = next(self.labeled_iter)
         shuffle_idx = torch.randperm(len(yl), device=yl.device)

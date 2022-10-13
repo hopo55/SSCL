@@ -64,6 +64,7 @@ def run(args):
                       'lr' : args.lr,
                       'momentum' : args.momentum,
                       'weight_decay' : args.weight_decay,
+                      'device' : args.device,
                      }
     learner = learners.__dict__[args.learner_type].__dict__[args.learner_name](learner_config)
 
@@ -86,7 +87,7 @@ def run(args):
         # load dataloader
         train_loader_l = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=False, num_workers=args.workers)
         train_loader_ul = DataLoader(train_dataset_ul, batch_size=args.ul_batch_size, shuffle=True, drop_last=False, num_workers=args.workers)
-        train_loader = loader.SSCLDataLoader(train_loader_l, train_loader_ul)
+        # train_loader = loader.SSCLDataLoader(train_loader_l, train_loader_ul)
 
         test_dataset.load_dataset(prev, i, train=False)
         test_loader  = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, drop_last=False, num_workers=args.workers)
@@ -96,7 +97,8 @@ def run(args):
         if not os.path.exists(model_save_dir): os.makedirs(model_save_dir)
 
         learner.add_valid_output_dim(out_dim_add)
-        learner.learn_batch(train_loader, train_dataset, train_dataset_ul, model_save_dir, test_loader)
+        # learner.learn_batch(train_loader, train_dataset, train_dataset_ul, model_save_dir, test_loader)
+        learner.learn_batch(train_loader_l, train_loader_ul, model_save_dir, test_loader)
 
         
 
@@ -105,6 +107,7 @@ if __name__ == '__main__':
 
     # Standard Args
     parser.add_argument('--seed', type=int, default=0, help='Set seed (default=0)')
+    parser.add_argument('--device', type=int, default=0, help='Set gpu id (default=0)')
     parser.add_argument('--dataset', type=str, default='CIFAR100', help="CIFAR10|CIFAR100")
     parser.add_argument('--log_dir', type=str, default="outputs", help="Save experiments results in dir for future plotting!")
     parser.add_argument('--dataroot', type=str, default='data', help="The root folder of dataset or downloaded data")

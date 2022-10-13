@@ -256,6 +256,7 @@ class ResNet(nn.Module):
     def __init__(self, block, num_blocks, num_classes, nf, bias):
         super(ResNet, self).__init__()
         self.in_planes = nf
+        self.input_features = nf * 8 * block.expansion
         self.conv1 = conv3x3(3, nf * 1)
         self.bn1 = nn.BatchNorm2d(nf * 1)
 
@@ -264,8 +265,8 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, nf * 4, num_blocks[2], stride=2)
         self.layer4 = self._make_layer(block, nf * 8, num_blocks[3], stride=2)
 
-        self.last = nn.Linear(nf * 8 * block.expansion, num_classes, bias=bias)
-        self.last_ncm = NearestClassMean(nf * 8 * block.expansion, num_classes)
+        # self.last = nn.Linear(nf * 8 * block.expansion, num_classes, bias=bias)
+        self.last = NearestClassMean(self.input_features, num_classes)
 
 
     def _make_layer(self, block, planes, num_blocks, stride):
@@ -287,24 +288,24 @@ class ResNet(nn.Module):
         out = out.view(out.size(0), -1)
         return out
 
-    def logits(self, x):
-        '''Apply the last FC linear mapping to get logits'''
+    def logits(self, x, y):
+        self.last.fit_batch(x, y)
         x = self.last(x)
         return x
 
-    def forward(self, x):
+    def forward(self, x, y):
         out = self.features(x)
-        logits = self.logits(out)
+        logits = self.logits(out, y)
         return logits
 
     # update center
-    def ood_forward(self, x, y):
+    def ood_update(self, x, y):
         out = self.features(x)
-        self.last_ncm.fit_batch(out, y)
+        self.last.fit_batch(out, y)
 
     def ood_logits(self, x):
         out = self.features(x)
-        logits = self.last_ncm.ood_predict(out)
+        logits = self.last.ood_predict(out)
         return logits
 
 def Reduced_ResNet18(out_dim=100, nf=20, bias=True):
