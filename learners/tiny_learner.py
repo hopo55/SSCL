@@ -23,6 +23,9 @@ class SSCL():
         self.criterion = nn.CrossEntropyLoss()
         self.ood_criterion = nn.CrossEntropyLoss()
 
+        self.model.num_classes = self.config['num_task']
+        self.model.threshold = self.config['threshold']
+
     def add_valid_output_dim(self, dim=0):
         print('Incremental class: Old valid output dimension:', self.valid_out_dim)
         self.valid_out_dim += dim
@@ -40,6 +43,7 @@ class SSCL():
             self.model.train()
             print('Epoch:{0}'.format(epoch+1))
 
+            # training labeled dataset
             for i, (xl, y)  in enumerate(train_loader_l):
                 xl, y = xl.to(self.device), y.to(self.device)
 
@@ -52,6 +56,10 @@ class SSCL():
                 loss.backward()
                 optimizer.step()
 
+        # update replay buffer (exist buffer and new train dataset)
+        
+
+        # Fine-tuning NCM using unlabed dataset(pseudo label)
         for i, (xul, yul)  in enumerate(train_loader_ul):
             xul, yul = xul.to(self.device), yul.to(self.device)
 

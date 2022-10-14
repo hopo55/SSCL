@@ -55,7 +55,11 @@ def run(args):
 
     train_dataset_ul = Dataset(args.dataroot, train=True, label=False, num_label_data=args.labeled_samples, class_type=args.class_type, transform=train_transform, download=True)
 
-    test_dataset  = Dataset(args.dataroot, train=False, class_type=args.class_type, transform=train_transform, download=True)
+    test_dataset  = Dataset(args.dataroot, train=False, class_type=args.class_type, transform=test_transform, download=True)
+
+    # in case tasks reset...
+    tasks = train_dataset.tasks
+    max_task = len(tasks)
 
     learner_config = {'num_classes': num_classes,
                       'model_type' : args.model_type,
@@ -64,13 +68,13 @@ def run(args):
                       'lr' : args.lr,
                       'momentum' : args.momentum,
                       'weight_decay' : args.weight_decay,
+                      'num_task' : max_task,
+                      'threshold' : args.threshold,
                       'device' : args.device,
                      }
     learner = learners.__dict__[args.learner_type].__dict__[args.learner_name](learner_config)
 
-    # in case tasks reset...
-    tasks = train_dataset.tasks
-    max_task = len(tasks)
+
 
     for i in range(max_task):
         train_name = task_names[i]
@@ -118,6 +122,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=0.1, help="Learning rate")
     parser.add_argument('--momentum', type=float, default=0.9)
     parser.add_argument('--weight_decay', type=float, default=5e-4)
+    parser.add_argument('--threshold', type=float, default=0.5)
 
     # SSCL Args
     parser.add_argument('--class_type', type=str, default='super', help="vanilla|super")

@@ -1,4 +1,5 @@
 import os
+from types import new_class
 import torch
 import torch.nn as nn
 from torch.nn.functional import relu, avg_pool2d
@@ -257,6 +258,8 @@ class ResNet(nn.Module):
         super(ResNet, self).__init__()
         self.in_planes = nf
         self.input_features = nf * 8 * block.expansion # 160
+        self.num_classes = num_classes
+        self.threshold = 0.1
         self.conv1 = conv3x3(3, nf * 1)
         self.bn1 = nn.BatchNorm2d(nf * 1)
 
@@ -266,7 +269,7 @@ class ResNet(nn.Module):
         self.layer4 = self._make_layer(block, nf * 8, num_blocks[3], stride=2)
 
         # self.last = nn.Linear(nf * 8 * block.expansion, num_classes, bias=bias)
-        self.last = NearestClassMean(self.input_features, num_classes)
+        self.last = NearestClassMean(self.input_features, self.num_classes)
 
 
     def _make_layer(self, block, planes, num_blocks, stride):
@@ -298,17 +301,36 @@ class ResNet(nn.Module):
         logits = self.logits(out, y)
         return logits
 
-    # update center
-    def ood_update(self, x, y):
-        out = self.features(x)
-        out = self.logits(out, )
-        print(out)
-        # self.last.fit_batch(out, y)
+    def update_buffer(self, x):
+        pass
 
-    def ood_logits(self, x):
-        out = self.features(x)
-        logits = self.last.ood_predict(out)
-        return logits
+    def ood_logits(self, feature, yul):
+        new_feature = torch.zeros(1)
+        new_yul = torch.zeros(1)
+
+        for idx in range(feature.size(0)):
+            out = feature[idx].view(1, -1)
+            out_y = yul[idx].view(1, -1)
+            logits = self.last.ood_predict(out)
+            if torch.max(logits) > self.threshold:
+                if torch.count_nonzero(new_feature) == 0:
+                    new_feature = out
+                    new_yul = out_y
+                new_feature = torch.cat([new_feature, out])
+                new_yul = torch.cat([new_yul, out_y])
+        
+        return new_feature
+
+    # update center
+    def ood_update(self, x, yul):
+        feature = self.features(x)
+        feature = self.ood_logits(feature, yul) # pseduo-labeling and filtering noisy data
+
+        if torch.Tensor.dim(feature) < 2:
+            print("skip")
+        else:
+            pass
+
 
 def Reduced_ResNet18(out_dim=100, nf=20, bias=True):
     # Reduced ResNet18 as in GEM MIR(note that nf=20).
