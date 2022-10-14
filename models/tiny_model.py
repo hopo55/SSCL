@@ -48,10 +48,10 @@ class NearestClassMean(nn.Module):
         y = y.long().to(self.device)
 
         # make sure things are the right shape
-        print('x shape', len(x.shape))
+        # print('x shape', len(x.shape))
         if len(x.shape) < 2:
             x = x.unsqueeze(0)
-        print('y shape', len(y.shape))
+        # print('y shape', len(y.shape))
         if len(y.shape) == 0:
             y = y.unsqueeze(0)
 
@@ -125,7 +125,7 @@ class NearestClassMean(nn.Module):
         return scores, labels
 
     @torch.no_grad()
-    def fit_batch(self, batch_x, batch_y, batch_ix):
+    def fit_batch(self, batch_x, batch_y):
         # fit NCM one example at a time
         for x, y in zip(batch_x, batch_y):
             self.fit(x.cpu(), y.view(1, ), None)
@@ -256,7 +256,7 @@ class ResNet(nn.Module):
     def __init__(self, block, num_blocks, num_classes, nf, bias):
         super(ResNet, self).__init__()
         self.in_planes = nf
-        self.input_features = nf * 8 * block.expansion
+        self.input_features = nf * 8 * block.expansion # 160
         self.conv1 = conv3x3(3, nf * 1)
         self.bn1 = nn.BatchNorm2d(nf * 1)
 
@@ -290,7 +290,7 @@ class ResNet(nn.Module):
 
     def logits(self, x, y):
         self.last.fit_batch(x, y)
-        x = self.last(x)
+        x = self.last.predict(x, return_probas=True)
         return x
 
     def forward(self, x, y):

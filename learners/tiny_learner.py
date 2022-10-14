@@ -15,11 +15,9 @@ class SSCL():
         self.valid_out_dim = 0
         self.num_classes = self.config['num_classes']
 
-        num_classes = 100
-
         # num tasks for repeats
         self.tasks = 0
-        self.model = models.__dict__[self.config['model_type']].__dict__[self.config['model_name']]()
+        self.model = models.__dict__[self.config['model_type']].__dict__[self.config['model_name']]().to(self.device)
 
         self.criterion = nn.CrossEntropyLoss()
         self.ood_criterion = nn.CrossEntropyLoss()
@@ -44,8 +42,12 @@ class SSCL():
             for i, (xl, y)  in enumerate(train_loader_l):
                 xl, y = xl.to(self.device), y.to(self.device)
 
-                output = self.model(xl)
+                output = self.model.forward(xl, y).to(self.device)
+                print(output.size())
                 loss = self.criterion(output, y)
 
                 print(loss)
+
+                optimizer.zero_grad()
+                loss.backward()
 

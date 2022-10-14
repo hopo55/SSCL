@@ -144,7 +144,7 @@ class CIFAR10(VisionDataset):
     
 
     def __len__(self) -> int:
-        return len(self.data)
+        return len(self.current_data)
 
 
     def _check_integrity(self) -> bool:
