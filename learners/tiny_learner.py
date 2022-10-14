@@ -1,3 +1,4 @@
+from tkinter import Variable
 import torch
 import models
 import torch.nn as nn
@@ -43,11 +44,17 @@ class SSCL():
                 xl, y = xl.to(self.device), y.to(self.device)
 
                 output = self.model.forward(xl, y).to(self.device)
-                print(output.size())
                 loss = self.criterion(output, y)
-
-                print(loss)
+                # print(loss)
 
                 optimizer.zero_grad()
+                loss.requires_grad = True
                 loss.backward()
+                optimizer.step()
+
+        for i, (xul, yul)  in enumerate(train_loader_ul):
+            xul, yul = xul.to(self.device), yul.to(self.device)
+
+            self.model.ood_update(xul, yul)
+
 

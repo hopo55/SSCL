@@ -11,7 +11,7 @@ class NearestClassMean(nn.Module):
     Code from https://github.com/tyler-hayes/Embedded-CL
     """
 
-    def __init__(self, input_shape, num_classes, backbone=None, device='cuda'):
+    def __init__(self, input_shape, num_classes, backbone=None, device='cuda:0'):
         """
         Init function for the NCM model.
         :param input_shape: feature dimension
@@ -21,7 +21,7 @@ class NearestClassMean(nn.Module):
         super(NearestClassMean, self).__init__()
 
         # NCM parameters
-        self.device = device
+        self.device = torch.device(device)
         self.in_features = input_shape
         self.num_classes = num_classes
 
@@ -301,7 +301,9 @@ class ResNet(nn.Module):
     # update center
     def ood_update(self, x, y):
         out = self.features(x)
-        self.last.fit_batch(out, y)
+        out = self.logits(out, )
+        print(out)
+        # self.last.fit_batch(out, y)
 
     def ood_logits(self, x):
         out = self.features(x)

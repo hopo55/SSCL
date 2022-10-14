@@ -114,7 +114,7 @@ if __name__ == '__main__':
     parser.add_argument('--workers', type=int, default=8, help="#Thread for dataloader")
     parser.add_argument('--model_type', type=str, default='tiny_model', help="The type tin_model of backbone network")
     parser.add_argument('--model_name', type=str, default='Reduced_ResNet18', help="The name of actual model for the backbone")
-    parser.add_argument('--epoch', type=int, default=10)
+    parser.add_argument('--epoch', type=int, default=1)
     parser.add_argument('--lr', type=float, default=0.1, help="Learning rate")
     parser.add_argument('--momentum', type=float, default=0.9)
     parser.add_argument('--weight_decay', type=float, default=5e-4)
