@@ -70,6 +70,7 @@ def run(args):
                       'weight_decay' : args.weight_decay,
                       'num_task' : max_task,
                       'threshold' : args.threshold,
+                      'memory' : args.memory,
                       'device' : args.device,
                      }
     learner = learners.__dict__[args.learner_type].__dict__[args.learner_name](learner_config)
@@ -123,6 +124,7 @@ if __name__ == '__main__':
     parser.add_argument('--momentum', type=float, default=0.9)
     parser.add_argument('--weight_decay', type=float, default=5e-4)
     parser.add_argument('--threshold', type=float, default=0.5)
+    parser.add_argument('--memory', type=int, default=400, help="size of memory for replay")
 
     # SSCL Args
     parser.add_argument('--class_type', type=str, default='super', help="vanilla|super")

@@ -1,5 +1,6 @@
 import os
 from types import new_class
+from numpy import outer
 import torch
 import torch.nn as nn
 from torch.nn.functional import relu, avg_pool2d
@@ -301,9 +302,6 @@ class ResNet(nn.Module):
         logits = self.logits(out, y)
         return logits
 
-    def update_buffer(self, x):
-        pass
-
     def ood_logits(self, feature, yul):
         new_feature = torch.zeros(1)
         new_yul = torch.zeros(1)
@@ -321,10 +319,16 @@ class ResNet(nn.Module):
         
         return new_feature
 
-    # update center
-    def ood_update(self, x, yul):
+    def predict(self, x):
         feature = self.features(x)
-        feature = self.ood_logits(feature, yul) # pseduo-labeling and filtering noisy data
+        out = self.last.predict(feature, return_probas=True)
+
+        return feature, out
+
+    # update center
+    def ood_update(self, x, y, buffer):
+        feature = self.features(x)
+        feature = self.ood_logits(feature, y) # pseduo-labeling and filtering noisy data
 
         if torch.Tensor.dim(feature) < 2:
             print("skip")
