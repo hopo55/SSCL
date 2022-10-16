@@ -76,7 +76,6 @@ def run(args):
     learner = learners.__dict__[args.learner_type].__dict__[args.learner_name](learner_config)
 
 
-
     for i in range(max_task):
         train_name = task_names[i]
         print('======================', train_name, '=======================')
@@ -131,7 +130,6 @@ if __name__ == '__main__':
     # SSCL Args
     parser.add_argument('--class_type', type=str, default='super', help="vanilla|super")
     parser.add_argument('--rand_split', default=False, action='store_true', help="Randomize the classes in splits")
-    parser.add_argument('--validation', default=False, action='store_true', help='Evaluate training dataset rather than testing data')
     parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--learner_type', type=str, default='tiny_learner', help="The type (filename) of learner")
     parser.add_argument('--learner_name', type=str, default='SSCL', help="The class name of learner")
