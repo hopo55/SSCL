@@ -317,7 +317,7 @@ class ResNet(nn.Module):
                 new_feature = torch.cat([new_feature, out])
                 new_yul = torch.cat([new_yul, out_y])
         
-        return new_feature
+        return new_feature, new_yul
 
     def predict(self, x):
         feature = self.features(x)
@@ -326,14 +326,16 @@ class ResNet(nn.Module):
         return feature, out
 
     # update center
-    def ood_update(self, x, y, buffer):
-        feature = self.features(x)
-        feature = self.ood_logits(feature, y) # pseduo-labeling and filtering noisy data
+    def ood_update(self, xul, yul, xb, yb):
+        feature = self.features(xul)
+        feature, yul = self.ood_logits(feature, yul) # pseduo-labeling and filtering noisy data
 
         if torch.Tensor.dim(feature) < 2:
             print("skip")
         else:
-            pass
+            ood_x = torch.cat([feature, xb])
+            ood_y = torch.cat([yul, yb])
+            self.last.fit_batch(ood_x, ood_y)
 
 
 def Reduced_ResNet18(out_dim=100, nf=20, bias=True):

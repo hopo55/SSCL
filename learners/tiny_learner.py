@@ -14,9 +14,10 @@ class SSCL():
         self.device = torch.device(device_id if torch.cuda.is_available() else 'cpu')
 
         self.valid_out_dim = 0
+        self.current_tasks = 0
         # self.num_classes = self.config['num_classes']   # not use?
 
-        self.frist_tasks = True
+        self.first_tasks = True
 
         self.model = models.__dict__[self.config['model_type']].__dict__[self.config['model_name']]().to(self.device)
         self.criterion = nn.CrossEntropyLoss()
@@ -25,14 +26,19 @@ class SSCL():
         self.model.num_classes = self.config['num_task']
         self.model.threshold = self.config['threshold']
         self.memory = self.config['memory']
-        self.replay_buffer = torch.Tensor()
+        self.past_memory = self.memory
+
+        self.buffer_x = torch.Tensor()
+        self.buffer_y = torch.Tensor()
         self.buffer_logits = torch.Tensor()
 
     def add_valid_output_dim(self, dim=0):
         print('Incremental class: Old valid output dimension:', self.valid_out_dim)
         self.valid_out_dim += dim
         print('Incremental class: New Valid output dimension:', self.valid_out_dim)
-        return self.valid_out_dim
+        self.current_tasks += 1
+        print('Incremental class: Current tasks:', self.current_tasks)
+
 
     # def learn_batch(self, train_loader, train_dataset, train_dataset_ul, model_dir, val_loader=None):
     def learn_batch(self, train_loader_l, train_loader_ul, model_dir, val_loader=None):
@@ -57,41 +63,83 @@ class SSCL():
                 optimizer.step()
 
         # update replay buffer (exist buffer and new train dataset)
-        if self.frist_tasks:
-            self.model.eval()
+        if self.first_tasks:
+            self.update_buffer(train_loader_l)
 
-            with torch.no_grad():
-                for i, (xl, y)  in enumerate(train_loader_l):
-                    xl, y = xl.to(self.device), y.to(self.device)
-
-                    feature, output = self.model.predict(xl)
-                    # feature, output, y = feature.cpu(), output.cpu(), y.cpu()
-
-                    for idx, out in enumerate(output):
-                        fe = feature[idx].view(1, -1)
-                        out = torch.max(out).view(-1)
-
-                        if self.replay_buffer.size(0) < self.memory:
-                            if self.replay_buffer.size(0) == 0: 
-                                self.replay_buffer = fe
-                                self.buffer_logits = out
-                            else:
-                                self.replay_buffer = torch.cat([self.replay_buffer, fe])
-                                self.buffer_logits = torch.cat([self.buffer_logits, out])
-                        else:
-                            min_value = torch.min(self.buffer_logits)
-                            if out[0] > min_value:
-                                min_idx = torch.argmin(self.buffer_logits)
-                                self.replay_buffer[min_idx] = fe
-                                self.buffer_logits[min_idx] = out
-                        
-        # Fine-tuning NCM using unlabed dataset(pseudo label)
+        # Fine-tuning NCM using unlabed dataset(pseudo label) and replay buffer
         for i, (xul, yul)  in enumerate(train_loader_ul):
+            self.model.eval()
             xul, yul = xul.to(self.device), yul.to(self.device)
 
-            self.model.ood_update(xul, yul, self.replay_buffer)
+            self.model.ood_update(xul, yul, self.buffer_x, self.buffer_y)
 
-    def update_buffer(self, x):
-        pass
+        if not self.first_tasks:
+            self.update_buffer(train_loader_ul, self.first_tasks)
 
+        self.first_tasks = False
 
+    def update_buffer(self, dataloader, first=True):
+        self.model.eval()
+
+        if first == False:
+            new_memory_size, _ = divmod(self.memory, self.current_tasks)
+
+            for idx in range(self.current_tasks - 1):
+                if self.current_tasks == 2:
+                    start = self.memory * idx
+                    end = self.memory * (idx + 1)
+                else:
+                    start = self.past_memory * idx
+                    end = self.past_memory * (idx + 1)
+
+                sort_index = torch.argsort(self.buffer_logits[start:end])
+                temp_buffer_x = self.buffer_x[start:end]
+                temp_buffer_x = temp_buffer_x[sort_index < new_memory_size].to(self.device)
+
+                temp_buffer_y = self.buffer_y[start:end]
+                temp_buffer_y = temp_buffer_y[sort_index < new_memory_size].to(self.device)
+
+                temp_buffer_logits = self.buffer_logits[start:end]
+                temp_buffer_logits = temp_buffer_logits[sort_index < new_memory_size]
+                    
+                if idx == 0:
+                    new_buffer_x = temp_buffer_x
+                    new_buffer_y = temp_buffer_y
+                    new_buffer_logits = temp_buffer_logits
+                else:
+                    new_buffer_x = torch.cat([new_buffer_x, temp_buffer_x])
+                    new_buffer_y = torch.cat([new_buffer_y, temp_buffer_y])
+                    new_buffer_logits = torch.cat([new_buffer_logits, temp_buffer_logits])
+
+            self.past_memory = new_memory_size
+            self.buffer_x = new_buffer_x
+            self.buffer_y = new_buffer_y
+            self.buffer_logits = new_buffer_logits
+
+        with torch.no_grad():
+            for x, y  in dataloader:
+                x, y = x.to(self.device), y.to(self.device)
+
+                feature, output = self.model.predict(x)
+
+                for idx, out in enumerate(output):
+                    fe = feature[idx].view(1, -1)
+                    fe_y = y[idx].view(1, -1)
+                    out = torch.max(out).view(-1)
+                    
+                    if self.buffer_x.size(0) < self.memory:
+                        if self.buffer_x.size(0) == 0 and first: 
+                            self.buffer_x = fe
+                            self.buffer_y = fe_y
+                            self.buffer_logits = out
+                        else:
+                            self.buffer_x = torch.cat([self.buffer_x, fe])
+                            self.buffer_y = torch.cat([self.buffer_y, fe_y])
+                            self.buffer_logits = torch.cat([self.buffer_logits, out])
+                    else:
+                        min_value = torch.min(self.buffer_logits)
+                        if out[0] > min_value:
+                            min_idx = torch.argmin(self.buffer_logits)
+                            self.buffer_x[min_idx] = fe
+                            self.buffer_y[min_idx] = fe_y
+                            self.buffer_logits[min_idx] = out
