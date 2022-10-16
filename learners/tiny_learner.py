@@ -1,8 +1,7 @@
-from tkinter import Variable
 import torch
 import models
 import torch.nn as nn
-from models.tiny_model import NearestClassMean
+from learners.utils import accuracy, AverageMeter
 
 import numpy as np
 
@@ -41,13 +40,15 @@ class SSCL():
 
 
     # def learn_batch(self, train_loader, train_dataset, train_dataset_ul, model_dir, val_loader=None):
-    def learn_batch(self, train_loader_l, train_loader_ul, model_dir, val_loader=None):
+    def learn_batch(self, train_loader_l, train_loader_ul, model_dir):
 
         print('Optimizer is reset!')
         optimizer = torch.optim.SGD(self.model.parameters(), lr=self.config['lr'], momentum=self.config['momentum'], weight_decay=self.config['weight_decay'])
 
         for epoch in range(self.config['epoch']):
             self.model.train()
+            losses = AverageMeter()
+            acc = AverageMeter()
             print('Epoch:{0}'.format(epoch+1))
 
             # training labeled dataset
@@ -62,16 +63,34 @@ class SSCL():
                 loss.backward()
                 optimizer.step()
 
+                losses.update(loss,  y.size(0))
+                acc.update(accuracy(output, y), y.size(0))
+            
+            print(' * Train Loss {loss.avg:.3f}'.format(loss=losses))
+            print(' * Train Acc {acc.avg:.3f}'.format(acc=acc))
+
         # update replay buffer (exist buffer and new train dataset)
         if self.first_tasks:
             self.update_buffer(train_loader_l)
 
         # Fine-tuning NCM using unlabed dataset(pseudo label) and replay buffer
+        ood_losses = AverageMeter()
+        ood_acc = AverageMeter()
+
         for i, (xul, yul)  in enumerate(train_loader_ul):
             self.model.eval()
             xul, yul = xul.to(self.device), yul.to(self.device)
 
             self.model.ood_update(xul, yul, self.buffer_x, self.buffer_y)
+            
+            ood_output = self.model.forward(xul, yul).to(self.device)
+            ool_loss = self.criterion(ood_output, yul)
+
+            ood_losses.update(ool_loss,  yul.size(0))
+            ood_acc.update(accuracy(ood_output, yul), yul.size(0))
+            
+        print(' * Train OoD Loss {loss.avg:.3f}'.format(loss=ood_losses))
+        print(' * Train OoD Acc {acc.avg:.3f}'.format(acc=ood_acc))
 
         if not self.first_tasks:
             self.update_buffer(train_loader_ul, self.first_tasks)
@@ -143,3 +162,16 @@ class SSCL():
                             self.buffer_x[min_idx] = fe
                             self.buffer_y[min_idx] = fe_y
                             self.buffer_logits[min_idx] = out
+
+    def validatioin(self, test_loader):
+        print("Validation test dataset")
+        val_acc = AverageMeter()
+        self.model.eval()
+
+        for x, y  in test_loader:
+            x, y = x.to(self.device), y.to(self.device)
+
+            _, output = self.model.predict(x)
+            val_acc.update(accuracy(output.to(self.device), y), y.size(0))
+
+        print(' * Validation Acc {acc.avg:.3f}'.format(acc=val_acc))
