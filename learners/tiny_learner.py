@@ -52,7 +52,7 @@ class SSCL():
             losses = AverageMeter()
             acc = AverageMeter()
             print('Epoch:{0}'.format(epoch+1))
-
+    
             # training labeled dataset
             for i, (xl, y)  in enumerate(train_loader_l):
                 xl, y = xl.to(self.device), y.to(self.device)
@@ -73,7 +73,7 @@ class SSCL():
 
         self.logger.writer('Training Accuracy', acc.avg, self.current_tasks)
 
-        # update replay buffer (exist buffer and new train dataset)
+        # Update replay buffer (only first task new train dataset)
         if self.first_tasks:
             self.update_buffer(train_loader_l)
 
@@ -81,23 +81,25 @@ class SSCL():
         self.model.eval()
         ood_losses = AverageMeter()
         ood_acc = AverageMeter()
+        
+        with torch.no_grad():
+            for i, (xul, yul)  in enumerate(train_loader_ul):
+                xul, yul = xul.to(self.device), yul.to(self.device)
 
-        for i, (xul, yul)  in enumerate(train_loader_ul):
-            xul, yul = xul.to(self.device), yul.to(self.device)
+                self.model.ood_update(xul, yul, self.buffer_x, self.buffer_y)
+                
+                ood_output = self.model.forward(xul, yul).to(self.device)
+                ool_loss = self.criterion(ood_output, yul)
 
-            self.model.ood_update(xul, yul, self.buffer_x, self.buffer_y)
-            
-            ood_output = self.model.forward(xul, yul).to(self.device)
-            ool_loss = self.criterion(ood_output, yul)
-
-            ood_losses.update(ool_loss,  yul.size(0))
-            ood_acc.update(accuracy(ood_output, yul), yul.size(0))
+                ood_losses.update(ool_loss,  yul.size(0))
+                ood_acc.update(accuracy(ood_output, yul), yul.size(0))
             
         print(' * Train OOD Loss {loss.avg:.3f}'.format(loss=ood_losses))
         print(' * Train OOD Acc {acc.avg:.3f}'.format(acc=ood_acc))
         
         self.logger.writer('Training OOD Accuracy', ood_acc.avg, self.current_tasks)
 
+        # Update replay buffer (exist buffer and new train dataset)
         if not self.first_tasks:
             self.update_buffer(train_loader_ul, self.first_tasks)
 
