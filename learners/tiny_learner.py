@@ -1,7 +1,7 @@
 import torch
 import models
 import torch.nn as nn
-from learners.utils import accuracy, AverageMeter
+from learners.utils import accuracy, AverageMeter, tensor_logger
 
 import numpy as np
 
@@ -30,6 +30,8 @@ class SSCL():
         self.buffer_x = torch.Tensor()
         self.buffer_y = torch.Tensor()
         self.buffer_logits = torch.Tensor()
+
+        self.logger = tensor_logger(self.config['logdir'])
 
     def add_valid_output_dim(self, dim=0):
         print('Incremental class: Old valid output dimension:', self.valid_out_dim)
@@ -68,6 +70,8 @@ class SSCL():
             
             print(' * Train Loss {loss.avg:.3f}'.format(loss=losses))
             print(' * Train Acc {acc.avg:.3f}'.format(acc=acc))
+
+        self.logger.writer('')
 
         # update replay buffer (exist buffer and new train dataset)
         if self.first_tasks:

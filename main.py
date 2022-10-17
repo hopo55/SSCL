@@ -72,6 +72,7 @@ def run(args):
                       'threshold' : args.threshold,
                       'memory' : args.memory,
                       'device' : args.device,
+                      'logdir' : args.log_dir + 'logs/sscl_'
                      }
     learner = learners.__dict__[args.learner_type].__dict__[args.learner_name](learner_config)
 

@@ -1,4 +1,8 @@
 import torch
+import datetime as dt
+from typing import Union
+from pathlib import Path
+from torch.utils.tensorboard import SummaryWriter
 
 def accuracy(output, target, topk=(1,)):
     """Computes the precision@k for the specified values of k"""
@@ -38,3 +42,29 @@ class AverageMeter(object):
             self.sum += val * n
             self.count += n
             self.avg = float(self.sum) / self.count
+
+
+def _is_aws_or_gcloud_path(tb_log_dir: str) -> bool:
+    return tb_log_dir.startswith("gs://") or tb_log_dir.startswith("s3://")
+
+def _make_path_if_local(tb_log_dir: Union[str, Path]) -> Union[str, Path]:
+    if isinstance(tb_log_dir, str) and _is_aws_or_gcloud_path(tb_log_dir):
+        return tb_log_dir
+
+    tb_log_dir = Path(tb_log_dir)
+    tb_log_dir.mkdir(parents=True, exist_ok=True)
+    return tb_log_dir
+
+
+class tensor_logger():
+    def __init__(self, path):
+        self.path = path
+        date = dt.datetime.now()
+        date = date.strftime("%Y_%m_%d_%H_%M_%S")
+        tb_log_dir = self.path + date
+
+        tb_log_dir = _make_path_if_local(tb_log_dir)
+        self.logger = SummaryWriter(tb_log_dir)
+
+    def writer(self, title, log_data, n_iter):
+        self.logger.add_scalar(title, log_data, n_iter)
