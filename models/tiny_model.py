@@ -331,7 +331,7 @@ class ResNet(nn.Module):
         feature, yul = self.ood_logits(feature, yul) # pseduo-labeling and filtering noisy data
 
         if torch.Tensor.dim(feature) < 2:
-            print("skip")
+            self.last.fit_batch(xb, yb)
         else:
             ood_x = torch.cat([feature, xb])
             ood_y = torch.cat([yul, yb])

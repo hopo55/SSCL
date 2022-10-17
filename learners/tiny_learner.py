@@ -78,11 +78,11 @@ class SSCL():
             self.update_buffer(train_loader_l)
 
         # Fine-tuning NCM using unlabed dataset(pseudo label) and replay buffer
+        self.model.eval()
         ood_losses = AverageMeter()
         ood_acc = AverageMeter()
 
         for i, (xul, yul)  in enumerate(train_loader_ul):
-            self.model.eval()
             xul, yul = xul.to(self.device), yul.to(self.device)
 
             self.model.ood_update(xul, yul, self.buffer_x, self.buffer_y)
@@ -174,11 +174,12 @@ class SSCL():
         val_acc = AverageMeter()
         self.model.eval()
 
-        for x, y  in test_loader:
-            x, y = x.to(self.device), y.to(self.device)
+        with torch.no_grad():
+            for x, y  in test_loader:
+                x, y = x.to(self.device), y.to(self.device)
 
-            _, output = self.model.predict(x)
-            val_acc.update(accuracy(output.to(self.device), y), y.size(0))
+                _, output = self.model.predict(x)
+                val_acc.update(accuracy(output.to(self.device), y), y.size(0))
 
-        print(' * Validation Acc {acc.avg:.3f}'.format(acc=val_acc))
-        self.logger.writer('Validation Accuracy', val_acc.avg, self.current_tasks)
+            print(' * Validation Acc {acc.avg:.3f}'.format(acc=val_acc))
+            self.logger.writer('Validation Accuracy', val_acc.avg, self.current_tasks)
