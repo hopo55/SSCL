@@ -71,7 +71,7 @@ class SSCL():
             print(' * Train Loss {loss.avg:.3f}'.format(loss=losses))
             print(' * Train Acc {acc.avg:.3f}'.format(acc=acc))
 
-        self.logger.writer('')
+        self.logger.writer('Training Accuracy', acc.avg, self.current_tasks)
 
         # update replay buffer (exist buffer and new train dataset)
         if self.first_tasks:
@@ -93,8 +93,10 @@ class SSCL():
             ood_losses.update(ool_loss,  yul.size(0))
             ood_acc.update(accuracy(ood_output, yul), yul.size(0))
             
-        print(' * Train OoD Loss {loss.avg:.3f}'.format(loss=ood_losses))
-        print(' * Train OoD Acc {acc.avg:.3f}'.format(acc=ood_acc))
+        print(' * Train OOD Loss {loss.avg:.3f}'.format(loss=ood_losses))
+        print(' * Train OOD Acc {acc.avg:.3f}'.format(acc=ood_acc))
+        
+        self.logger.writer('Training OOD Accuracy', ood_acc.avg, self.current_tasks)
 
         if not self.first_tasks:
             self.update_buffer(train_loader_ul, self.first_tasks)
@@ -179,3 +181,4 @@ class SSCL():
             val_acc.update(accuracy(output.to(self.device), y), y.size(0))
 
         print(' * Validation Acc {acc.avg:.3f}'.format(acc=val_acc))
+        self.logger.writer('Validation Accuracy', val_acc.avg, self.current_tasks)
