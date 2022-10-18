@@ -33,8 +33,8 @@ class NearestClassMean(nn.Module):
             self.backbone = backbone.eval().to(device)
 
         # setup weights for NCM
-        self.muK = torch.zeros((num_classes, input_shape)).to(self.device)
-        self.cK = torch.zeros(num_classes).to(self.device)
+        self.muK = torch.zeros((self.num_classes, input_shape)).to(self.device)
+        self.cK = torch.zeros(self.num_classes).to(self.device)
         self.num_updates = 0
 
     @torch.no_grad()
@@ -255,7 +255,7 @@ class Bottleneck(nn.Module):
         return out
 
 class ResNet(nn.Module):
-    def __init__(self, block, num_blocks, num_classes, nf, bias):
+    def __init__(self, block, num_blocks, num_classes, nf, bias, threshold):
         super(ResNet, self).__init__()
         self.in_planes = nf
         self.input_features = nf * 8 * block.expansion # 160
@@ -338,9 +338,9 @@ class ResNet(nn.Module):
             self.last.fit_batch(ood_x, ood_y)
 
 
-def Reduced_ResNet18(out_dim=100, nf=20, bias=True):
+def Reduced_ResNet18(out_dim=100, nf=20, bias=True, threshold=0.1):
     # Reduced ResNet18 as in GEM MIR(note that nf=20).
-    return ResNet(BasicBlock, [2, 2, 2, 2], out_dim, nf, bias)
+    return ResNet(BasicBlock, [2, 2, 2, 2], out_dim, nf, bias, threshold)
 
 def ResNet18(out_dim=100, nf=64, bias=True):
     return ResNet(BasicBlock, [2, 2, 2, 2], out_dim, nf, bias)

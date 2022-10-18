@@ -1,6 +1,7 @@
 #!/usr/bin/bash
 WORKERS=8
-MODEL_NAME='ResNet18'
+# MODEL_NAME='ResNet18'Reduced_ResNet18
+MODEL_NAME='Reduced_ResNet18'
 EPOCH=10
 THRESHOLD=0.5
 MEMORY=400

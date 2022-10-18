@@ -17,13 +17,13 @@ class SSCL():
         # self.num_classes = self.config['num_classes']   # not use?
 
         self.first_tasks = True
+        num_classes = self.config['num_task']
+        threshold = self.config['threshold']
 
-        self.model = models.__dict__[self.config['model_type']].__dict__[self.config['model_name']]().to(self.device)
+        self.model = models.__dict__[self.config['model_type']].__dict__[self.config['model_name']](out_dim=num_classes, threshold=threshold).to(self.device)
         self.criterion = nn.CrossEntropyLoss()
         self.ood_criterion = nn.CrossEntropyLoss()
 
-        self.model.num_classes = self.config['num_task']
-        self.model.threshold = self.config['threshold']
         self.memory = self.config['memory']
         self.past_memory = self.memory
 
@@ -98,6 +98,7 @@ class SSCL():
         print(' * Train OOD Acc {acc.avg:.3f}'.format(acc=ood_acc))
         
         self.logger.writer('Training OOD Accuracy', ood_acc.avg, self.current_tasks)
+        print('OOD Center : ', self.model.last.muK.size())
 
         # Update replay buffer (exist buffer and new train dataset)
         if not self.first_tasks:
