@@ -14,15 +14,13 @@ class SSCL():
 
         self.valid_out_dim = 0
         self.current_tasks = 0
-        # self.num_classes = self.config['num_classes']   # not use?
 
         self.first_tasks = True
         # num_classes = self.config['num_task']
         num_classes = self.config['num_classes']
         threshold = self.config['threshold']
 
-        self.model = models.__dict__[self.config['model_type']].__dict__[self.config['model_name']](out_dim=num_classes, threshold=threshold).to(self.device)
-        self.criterion = nn.CrossEntropyLoss()
+        self.model = models.__dict__[self.config['model_type']].__dict__[self.config['model_name']](num_classes=num_classes, threshold=threshold).to(self.device)
         self.ood_criterion = nn.CrossEntropyLoss()
 
         self.memory = self.config['memory']
@@ -43,7 +41,7 @@ class SSCL():
 
 
     # def learn_batch(self, train_loader, train_dataset, train_dataset_ul, model_dir, val_loader=None):
-    def learn_batch(self, train_loader_l, train_loader_ul, model_dir):
+    def learn_batch(self, train_loader_l, train_loader_ul, criterion, model_dir):
 
         print('Optimizer is reset!')
         optimizer = torch.optim.SGD(self.model.parameters(), lr=self.config['lr'], momentum=self.config['momentum'], weight_decay=self.config['weight_decay'])
@@ -59,7 +57,7 @@ class SSCL():
                 xl, y = xl.to(self.device), y.to(self.device)
 
                 output = self.model.forward(xl, y).to(self.device)
-                loss = self.criterion(output, y)
+                loss = criterion(output, y)
 
                 optimizer.zero_grad()
                 loss.requires_grad = True
@@ -90,7 +88,7 @@ class SSCL():
                 self.model.ood_update(xul, yul, self.buffer_x, self.buffer_y)
                 
                 ood_output = self.model.forward(xul, yul).to(self.device)
-                ool_loss = self.criterion(ood_output, yul)
+                ool_loss = self.ood_criterion(ood_output, yul)
 
                 ood_losses.update(ool_loss,  yul.size(0))
                 ood_acc.update(accuracy(ood_output, yul), yul.size(0))

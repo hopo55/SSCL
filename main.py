@@ -85,6 +85,8 @@ def run(args):
         task = tasks_logits[i]
         prev = sorted(set([k for task in tasks_logits[:i] for k in task]))
 
+        print(train_dataset.class_list[i])
+
         train_dataset.load_dataset(prev, i, train=True)
         train_dataset_ul.load_dataset(prev, i, train=True)
         out_dim_add = len(task)
@@ -101,9 +103,13 @@ def run(args):
         model_save_dir = args.log_dir + '/models/task-'+task_names[i]+'/'
         if not os.path.exists(model_save_dir): os.makedirs(model_save_dir)
 
+        weight = torch.zeros(num_classes)
+        weight[i] = 1
+        weight = weight.to('cuda:' + str(args.device))
+        criterion = torch.nn.CrossEntropyLoss(weight=weight)
+
         learner.add_valid_output_dim(out_dim_add)
-        # learner.learn_batch(train_loader, train_dataset, train_dataset_ul, model_save_dir, test_loader)
-        learner.learn_batch(train_loader_l, train_loader_ul, model_save_dir)
+        learner.learn_batch(train_loader_l, train_loader_ul, criterion, model_save_dir)
 
         learner.validatioin(test_loader)
 
