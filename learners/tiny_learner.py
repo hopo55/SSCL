@@ -17,7 +17,8 @@ class SSCL():
         # self.num_classes = self.config['num_classes']   # not use?
 
         self.first_tasks = True
-        num_classes = self.config['num_task']
+        # num_classes = self.config['num_task']
+        num_classes = self.config['num_classes']
         threshold = self.config['threshold']
 
         self.model = models.__dict__[self.config['model_type']].__dict__[self.config['model_name']](out_dim=num_classes, threshold=threshold).to(self.device)
