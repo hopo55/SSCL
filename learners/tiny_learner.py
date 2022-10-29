@@ -66,7 +66,7 @@ class SSCL():
                 loss = self.criterion(output, y)
 
                 optimizer.zero_grad()
-                # loss.requires_grad = True
+                loss.requires_grad = True
                 loss.backward()
                 optimizer.step()
 
