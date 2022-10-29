@@ -23,7 +23,7 @@ class NearestClassMean(nn.Module):
         super(NearestClassMean, self).__init__()
 
         # NCM parameters
-        self.device = torch.device(device)
+        self.device = device
         self.in_features = input_shape
         self.num_classes = num_classes
 
@@ -255,7 +255,7 @@ class Bottleneck(nn.Module):
         return out
 
 class ResNet(nn.Module):
-    def __init__(self, block, num_blocks, num_classes, nf, bias, threshold):
+    def __init__(self, block, num_blocks, num_classes, nf, bias, threshold, device):
         super(ResNet, self).__init__()
         self.in_planes = nf
         self.input_features = nf * 8 * block.expansion # 160
@@ -269,8 +269,8 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, nf * 4, num_blocks[2], stride=2)
         self.layer4 = self._make_layer(block, nf * 8, num_blocks[3], stride=2)
 
-        # self.last = nn.Linear(nf * 8 * block.expansion, num_classes, bias=bias)
-        self.last = NearestClassMean(self.input_features, self.num_classes)
+        self.fc = nn.Linear(nf * 8 * block.expansion, self.num_classes, bias=bias)
+        self.ncm = NearestClassMean(self.input_features, self.num_classes, device=device)
 
 
     def _make_layer(self, block, planes, num_blocks, stride):
@@ -293,14 +293,19 @@ class ResNet(nn.Module):
         return out
 
     def logits(self, x, y):
-        self.last.fit_batch(x, y)
-        x = self.last.predict(x, return_probas=True)
+        self.ncm.fit_batch(x, y)
+        # x = self.ncm.predict(x, return_probas=True)
+        x = self.ncm.predict(x)
         return x
 
-    def forward(self, x, y):
+    def forward(self, x, y, train):
         out = self.features(x)
-        logits = self.logits(out, y)
-        return logits
+
+        if train:
+            logit = self.fc(out)
+        else:
+            logit = self.logits(out, y)
+        return logit
 
     def ood_logits(self, feature, yul):
         new_feature = torch.zeros(1)
@@ -309,7 +314,7 @@ class ResNet(nn.Module):
         for idx in range(feature.size(0)):
             out = feature[idx].view(1, -1)
             out_y = yul[idx].view(1, -1)
-            logits = self.last.ood_predict(out)
+            logits = self.ncm.ood_predict(out)
             if torch.max(logits) > self.threshold:
                 if torch.count_nonzero(new_feature) == 0:
                     new_feature = out
@@ -321,7 +326,7 @@ class ResNet(nn.Module):
 
     def predict(self, x):
         feature = self.features(x)
-        out = self.last.predict(feature, return_probas=True)
+        out = self.ncm.predict(feature, return_probas=True)
 
         return feature, out
 
@@ -331,16 +336,16 @@ class ResNet(nn.Module):
         feature, yul = self.ood_logits(feature, yul) # pseduo-labeling and filtering noisy data
 
         if torch.Tensor.dim(feature) < 2:
-            self.last.fit_batch(xb, yb)
+            self.ncm.fit_batch(xb, yb)
         else:
             ood_x = torch.cat([feature, xb])
             ood_y = torch.cat([yul, yb])
-            self.last.fit_batch(ood_x, ood_y)
+            self.ncm.fit_batch(ood_x, ood_y)
 
 
-def Reduced_ResNet18(num_classes=100, nf=20, bias=True, threshold=0.1):
+def Reduced_ResNet18(num_classes=100, nf=20, bias=True, threshold=0.1, device='cuda:0'):
     # Reduced ResNet18 as in GEM MIR(note that nf=20).
-    return ResNet(BasicBlock, [2, 2, 2, 2], num_classes, nf, bias, threshold)
+    return ResNet(BasicBlock, [2, 2, 2, 2], num_classes, nf, bias, threshold, device)
 
 def ResNet18(num_classes=100, nf=64, bias=True):
     return ResNet(BasicBlock, [2, 2, 2, 2], num_classes, nf, bias)

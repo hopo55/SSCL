@@ -20,7 +20,9 @@ class SSCL():
         num_classes = self.config['num_classes']
         threshold = self.config['threshold']
 
-        self.model = models.__dict__[self.config['model_type']].__dict__[self.config['model_name']](num_classes=num_classes, threshold=threshold).to(self.device)
+        self.model = models.__dict__[self.config['model_type']].__dict__[self.config['model_name']](num_classes=num_classes, threshold=threshold, device=self.device)
+        self.model.to(self.device)
+        self.criterion = nn.CrossEntropyLoss()
         self.ood_criterion = nn.CrossEntropyLoss()
 
         self.memory = self.config['memory']
@@ -32,6 +34,10 @@ class SSCL():
 
         self.logger = tensor_logger(self.config['logdir'])
 
+        self.total_train_acc = AverageMeter()
+        self.total_ood_acc = AverageMeter()
+        self.total_val_acc = AverageMeter()
+
     def add_valid_output_dim(self, dim=0):
         print('Incremental class: Old valid output dimension:', self.valid_out_dim)
         self.valid_out_dim += dim
@@ -41,9 +47,9 @@ class SSCL():
 
 
     # def learn_batch(self, train_loader, train_dataset, train_dataset_ul, model_dir, val_loader=None):
-    def learn_batch(self, train_loader_l, train_loader_ul, criterion, model_dir):
+    def learn_batch(self, train_loader_l, train_loader_ul, model_dir):
 
-        print('Optimizer is reset!')
+        print('Optimizer & loss is reset!')
         optimizer = torch.optim.SGD(self.model.parameters(), lr=self.config['lr'], momentum=self.config['momentum'], weight_decay=self.config['weight_decay'])
 
         for epoch in range(self.config['epoch']):
@@ -56,15 +62,16 @@ class SSCL():
             for i, (xl, y)  in enumerate(train_loader_l):
                 xl, y = xl.to(self.device), y.to(self.device)
 
-                output = self.model.forward(xl, y).to(self.device)
-                loss = criterion(output, y)
+                output = self.model.forward(xl, y, train=True)
+                # output, _ = self.model.forward(xl, y).to(self.device)
+                loss = self.criterion(output, y)
 
                 optimizer.zero_grad()
-                loss.requires_grad = True
+                # loss.requires_grad = True
                 loss.backward()
                 optimizer.step()
 
-                losses.update(loss,  y.size(0))
+                losses.update(loss, y.size(0))
                 acc.update(accuracy(output, y), y.size(0))
             
             print(' * Train Loss {loss.avg:.3f}'.format(loss=losses))
@@ -72,32 +79,34 @@ class SSCL():
 
         self.logger.writer('Training Accuracy', acc.avg, self.current_tasks)
 
+        self.total_train_acc.update(acc.avg)
+
         # Update replay buffer (only first task new train dataset)
         if self.first_tasks:
             self.update_buffer(train_loader_l)
 
         # Fine-tuning NCM using unlabed dataset(pseudo label) and replay buffer
-        self.model.eval()
+        self.model.train()
         ood_losses = AverageMeter()
         ood_acc = AverageMeter()
         
-        with torch.no_grad():
-            for i, (xul, yul)  in enumerate(train_loader_ul):
-                xul, yul = xul.to(self.device), yul.to(self.device)
+        for i, (xul, yul)  in enumerate(train_loader_ul):
+            xul, yul = xul.to(self.device), yul.to(self.device)
 
-                self.model.ood_update(xul, yul, self.buffer_x, self.buffer_y)
-                
-                ood_output = self.model.forward(xul, yul).to(self.device)
-                ool_loss = self.ood_criterion(ood_output, yul)
+            self.model.ood_update(xul, yul, self.buffer_x, self.buffer_y)
+            
+            ood_output = self.model.forward(xul, yul, train=False).to(self.device)
+            ool_loss = self.ood_criterion(ood_output, yul)
 
-                ood_losses.update(ool_loss,  yul.size(0))
-                ood_acc.update(accuracy(ood_output, yul), yul.size(0))
+            ood_losses.update(ool_loss, yul.size(0))
+            ood_acc.update(accuracy(ood_output, yul), yul.size(0))
             
         print(' * Train OOD Loss {loss.avg:.3f}'.format(loss=ood_losses))
         print(' * Train OOD Acc {acc.avg:.3f}'.format(acc=ood_acc))
         
         self.logger.writer('Training OOD Accuracy', ood_acc.avg, self.current_tasks)
-        print('OOD Center : ', self.model.last.muK.size())
+
+        self.total_ood_acc.update(ood_acc.avg)
 
         # Update replay buffer (exist buffer and new train dataset)
         if not self.first_tasks:
@@ -185,3 +194,5 @@ class SSCL():
 
             print(' * Validation Acc {acc.avg:.3f}'.format(acc=val_acc))
             self.logger.writer('Validation Accuracy', val_acc.avg, self.current_tasks)
+
+        self.total_val_acc.update(val_acc.avg)
