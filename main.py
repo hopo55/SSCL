@@ -140,10 +140,10 @@ if __name__ == '__main__':
     # SSCL Args
     parser.add_argument('--class_type', type=str, default='super', help="vanilla|super")
     parser.add_argument('--rand_split', default=False, action='store_true', help="Randomize the classes in splits")
-    parser.add_argument('--batch_size', type=int, default=16)
+    parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--learner_type', type=str, default='tiny_learner', help="The type (filename) of learner")
     parser.add_argument('--learner_name', type=str, default='SSCL', help="The class name of learner")
-    parser.add_argument('--ul_batch_size', type=int, default=32)
+    parser.add_argument('--ul_batch_size', type=int, default=16)
     parser.add_argument('--labeled_samples', type=int, default=500, help='Number of labeled samples each task in ssl')
     parser.add_argument('--unlabeled_task_samples', type=int, default=-1, help='Number of unlabeled samples in each task in ssl')
 
