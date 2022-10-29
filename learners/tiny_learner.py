@@ -62,8 +62,7 @@ class SSCL():
             for i, (xl, y)  in enumerate(train_loader_l):
                 xl, y = xl.to(self.device), y.to(self.device)
 
-                output = self.model.forward(xl, y, train=True)
-                # output, _ = self.model.forward(xl, y).to(self.device)
+                output = self.model.forward(xl, y).to(self.device)
                 loss = self.criterion(output, y)
 
                 optimizer.zero_grad()
@@ -95,7 +94,7 @@ class SSCL():
 
             self.model.ood_update(xul, yul, self.buffer_x, self.buffer_y)
             
-            ood_output = self.model.forward(xul, yul, train=False).to(self.device)
+            ood_output = self.model.forward(xul, yul).to(self.device)
             ool_loss = self.ood_criterion(ood_output, yul)
 
             ood_losses.update(ool_loss, yul.size(0))
