@@ -269,7 +269,6 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, nf * 4, num_blocks[2], stride=2)
         self.layer4 = self._make_layer(block, nf * 8, num_blocks[3], stride=2)
 
-        self.fc = nn.Linear(nf * 8 * block.expansion, self.num_classes, bias=bias)
         self.ncm = NearestClassMean(self.input_features, self.num_classes, device=device)
 
 
@@ -298,13 +297,9 @@ class ResNet(nn.Module):
         x = self.ncm.predict(x)
         return x
 
-    def forward(self, x, y, train):
+    def forward(self, x, y):
         out = self.features(x)
-
-        if train:
-            logit = self.fc(out)
-        else:
-            logit = self.logits(out, y)
+        logit = self.logits(out, y)
         return logit
 
     def ood_logits(self, feature, yul):
