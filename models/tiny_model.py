@@ -40,9 +40,13 @@ class NearestClassMean(nn.Module):
         self.cK = torch.zeros(self.num_classes).to(self.device) # class count
 
     @torch.no_grad()
-    def init_weights(self):
-        self.temp_muK = torch.zeros((self.num_classes, self.in_features)).to(self.device)
-        self.temp_cK = torch.zeros(self.num_classes).to(self.device)
+    def init_weights(self, first):
+        if first:
+            self.temp_muK = torch.zeros((self.num_classes, self.in_features)).to(self.device)
+            self.temp_cK = torch.zeros(self.num_classes).to(self.device)
+        else:
+            self.temp_muK = self.muK
+            self.temp_cK = self.cK
 
     @torch.no_grad()
     def fit(self, x, y, ncm_update):
@@ -99,14 +103,24 @@ class NearestClassMean(nn.Module):
 
         if ncm_update:
             scores = self.find_dists(self.muK, X)
+
+            # mask off predictions for unseen classes
+            # visited_ix = torch.where(self.cK != 0)[0]
+            # scores = scores[:, visited_ix]
+            not_visited_ix = torch.where(self.cK == 0)[0]
+            min_col = torch.min(scores, dim=1)[0].unsqueeze(0) - 1
+            scores[:, not_visited_ix] = min_col.tile(len(not_visited_ix)).reshape(
+                len(not_visited_ix), len(X)).transpose(1, 0)  # mask off scores for unseen classes
         else:
             scores = self.find_dists(self.temp_muK, X)
 
-        # mask off predictions for unseen classes
-        not_visited_ix = torch.where(self.cK == 0)[0]
-        min_col = torch.min(scores, dim=1)[0].unsqueeze(0) - 1
-        scores[:, not_visited_ix] = min_col.tile(len(not_visited_ix)).reshape(
-            len(not_visited_ix), len(X)).transpose(1, 0)  # mask off scores for unseen classes
+            # mask off predictions for unseen classes
+            # visited_ix = torch.where(self.temp_cK != 0)[0]
+            # scores = scores[:, visited_ix]
+            not_visited_ix = torch.where(self.temp_cK == 0)[0]
+            min_col = torch.min(scores, dim=1)[0].unsqueeze(0) - 1
+            scores[:, not_visited_ix] = min_col.tile(len(not_visited_ix)).reshape(
+                len(not_visited_ix), len(X)).transpose(1, 0)  # mask off scores for unseen classes
 
         # return predictions or probabilities
         if not return_probas:
@@ -223,8 +237,8 @@ class ResNet(nn.Module):
 
     def logits(self, x, y, ncm_update):
         self.ncm.fit_batch(x, y, ncm_update)
-        x = self.ncm.predict(x, ncm_update)
-        # x = self.ncm.predict(x, return_probas=True)
+        x = self.ncm.predict(x, ncm_update=ncm_update, return_probas=True)
+
         return x
 
     def forward(self, x, y, ncm_update):
@@ -252,7 +266,7 @@ class ResNet(nn.Module):
 
     def predict(self, x):
         feature = self.features(x)
-        out = self.ncm.predict(feature, return_probas=True)
+        out = self.ncm.predict(feature, ncm_update=True, return_probas=True)
 
         return feature, out
 
@@ -262,17 +276,17 @@ class ResNet(nn.Module):
         feature, yul = self.ood_logits(feature, yul) # pseduo-labeling and filtering noisy data
 
         if torch.Tensor.dim(feature) < 2:
-            self.ncm.fit_batch(xb, yb)
-            out = self.ncm.predict(xb)
+            self.ncm.fit_batch(xb, yb, ncm_update=True)
+            out = self.ncm.predict(xb, ncm_update=True, return_probas=True)
             target = yb
         else:
             ood_x = torch.cat([feature, xb])
             ood_y = torch.cat([yul, yb])
-            self.ncm.fit_batch(ood_x, ood_y)
-            out = self.ncm.predict(xb)
+            self.ncm.fit_batch(ood_x, ood_y, ncm_update=True)
+            out = self.ncm.predict(ood_x, ncm_update=True, return_probas=True)
             target = ood_y
 
-        return out, target
+        return out, target.squeeze(dim=-1)
 
 
 def Reduced_ResNet18(num_classes=100, nf=20, bias=True, threshold=0.1, device='cuda:0'):

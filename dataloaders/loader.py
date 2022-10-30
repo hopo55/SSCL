@@ -172,24 +172,27 @@ class CIFAR10(VisionDataset):
                     self.current_targets = [self.targets[k] for k in self.class_list[t]]
                 else:
                     self.current_data = self.data[self.class_list[t]]
-                    self.current_targets = [self.targets[k] for k in self.class_list[t]]
-                    # self.current_targets = [self.course_targets[k] for k in self.class_list[t]]
+                    # self.current_targets = [self.targets[k] for k in self.class_list[t]]
+                    self.current_targets = [self.course_targets[k] for k in self.class_list[t]]
             else:
                 if self.class_type == 'vanilla':
                     self.current_data = self.data[self.class_list[t]]
                     self.current_targets = [self.targets[k] for k in self.class_list[t]]
                 else:
                     self.current_data = self.data[self.class_list[t]]
-                    self.current_targets = [self.targets[k] for k in self.class_list[t]]
-                    # self.current_targets = [self.course_targets[k] for k in self.class_list[t]]
+                    # self.current_targets = [self.targets[k] for k in self.class_list[t]]
+                    self.current_targets = [self.course_targets[k] for k in self.class_list[t]]
         else:
             if self.class_type == 'vanilla':
                 self.current_data = self.data[self.class_list[t]]
-                self.current_targets = [self.targets[k] for k in self.class_list[t]]
+                self.current_targets = [self.targets[k] for k in self.class_list[:t]]
             else:
-                self.current_data = self.data[self.class_list[t]]
-                self.current_targets = [self.targets[k] for k in self.class_list[t]]
+                # self.current_data = self.data[self.class_list[t]]
+                # # self.current_targets = [self.targets[k] for k in self.class_list[t]]
                 # self.current_targets = [self.course_targets[k] for k in self.class_list[t]]
+                self.current_data.extend(self.data[self.class_list[t]])
+                # self.current_targets = [self.targets[k] for k in self.class_list[t]]
+                self.current_targets.extend([self.course_targets[k] for k in self.class_list[t]])
 
 
 class CIFAR100(CIFAR10):

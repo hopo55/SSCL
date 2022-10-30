@@ -92,11 +92,10 @@ def run(args):
         # load dataloader
         train_loader_l = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=False, num_workers=args.workers)
         train_loader_ul = DataLoader(train_dataset_ul, batch_size=args.ul_batch_size, shuffle=True, drop_last=False, num_workers=args.workers)
-        # train_loader = loader.SSCLDataLoader(train_loader_l, train_loader_ul)
 
         test_dataset.load_dataset(prev, i, train=False)
         test_loader  = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, drop_last=False, num_workers=args.workers)
-        
+
         # add valid class for classifier
         model_save_dir = args.log_dir + '/models/task-'+task_names[i]+'/'
         if not os.path.exists(model_save_dir): os.makedirs(model_save_dir)

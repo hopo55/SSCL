@@ -67,6 +67,10 @@ class SSCL():
                 xl, y = xl.to(self.device), y.to(self.device)
 
                 output = self.model.forward(xl, y, ncm_update).to(self.device)
+                # print("=================config=================")
+                # print(output)
+                # print(y)
+                # print("========================================")
                 loss = self.criterion(output, y)
 
                 optimizer.zero_grad()
@@ -77,7 +81,7 @@ class SSCL():
                 losses.update(loss, y.size(0))
                 acc.update(accuracy(output, y), y.size(0))
 
-            self.model.ncm.init_weights()
+            self.model.ncm.init_weights(self.first_tasks)
             
             print(' * Train Loss {loss.avg:.3f}'.format(loss=losses))
             print(' * Train Acc {acc.avg:.3f}'.format(acc=acc))
@@ -91,7 +95,7 @@ class SSCL():
             self.update_buffer(train_loader_l)
 
         # Fine-tuning NCM using unlabed dataset(pseudo label) and replay buffer
-        self.model.train()
+        self.model.eval()
         ood_losses = AverageMeter()
         ood_acc = AverageMeter()
         
@@ -99,6 +103,7 @@ class SSCL():
             xul, yul = xul.to(self.device), yul.to(self.device)
 
             ood_output, ood_target = self.model.ood_update(xul, yul, self.buffer_x, self.buffer_y)
+            ood_output = ood_output.to(self.device)
             ool_loss = self.ood_criterion(ood_output, ood_target)
 
             ood_losses.update(ool_loss, ood_target.size(0))
