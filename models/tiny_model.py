@@ -40,17 +40,12 @@ class NearestClassMean(nn.Module):
         self.cK = torch.zeros(self.num_classes).to(self.device) # class count
 
     @torch.no_grad()
-    def init_weights(self, x, y):
+    def init_weights(self):
         self.temp_muK = torch.zeros((self.num_classes, self.in_features)).to(self.device)
         self.temp_cK = torch.zeros(self.num_classes).to(self.device)
 
     @torch.no_grad()
-    def update_weights(self, x, y):
-        self.muK[y, :] += (x - self.muK[y, :]) / (self.cK[y] + 1).unsqueeze(1)
-        self.cK[y] += 1
-
-    @torch.no_grad()
-    def fit(self, x, y, item_ix):
+    def fit(self, x, y, ncm_update):
         """
         Fit the NCM model to a new sample (x,y).
         :param item_ix:
@@ -70,8 +65,12 @@ class NearestClassMean(nn.Module):
             y = y.unsqueeze(0)
 
         # update class means
-        self.temp_muK[y, :] += (x - self.temp_muK[y, :]) / (self.temp_cK[y] + 1).unsqueeze(1)
-        self.temp_cK[y] += 1
+        if ncm_update:
+            self.muK[y, :] += (x - self.muK[y, :]) / (self.cK[y] + 1).unsqueeze(1)
+            self.cK[y] += 1
+        else:
+            self.temp_muK[y, :] += (x - self.temp_muK[y, :]) / (self.temp_cK[y] + 1).unsqueeze(1)
+            self.temp_cK[y] += 1
 
     @torch.no_grad()
     def find_dists(self, A, B):
@@ -89,7 +88,7 @@ class NearestClassMean(nn.Module):
         return -dist
 
     @torch.no_grad()
-    def predict(self, X, return_probas=False):
+    def predict(self, X, ncm_update=False, return_probas=False):
         """
         Make predictions on test data X.
         :param X: a torch tensor that contains N data samples (N x d)
@@ -98,7 +97,10 @@ class NearestClassMean(nn.Module):
         """
         X = X.to(self.device)
 
-        scores = self.find_dists(self.muK, X)
+        if ncm_update:
+            scores = self.find_dists(self.muK, X)
+        else:
+            scores = self.find_dists(self.temp_muK, X)
 
         # mask off predictions for unseen classes
         not_visited_ix = torch.where(self.cK == 0)[0]
@@ -114,34 +116,13 @@ class NearestClassMean(nn.Module):
 
     @torch.no_grad()
     def ood_predict(self, x):
-        return self.predict(x, return_probas=True)
+        return self.predict(x, ncm_update=True, return_probas=True)
 
     @torch.no_grad()
-    def evaluate_ood_(self, test_loader):
-        print('\nTesting OOD on %d images.' % len(test_loader.dataset))
-
-        num_samples = len(test_loader.dataset)
-        scores = torch.empty((num_samples, self.num_classes))
-        labels = torch.empty(num_samples).long()
-        start = 0
-        for test_x, test_y in test_loader:
-            if self.backbone is not None:
-                batch_x_feat = self.backbone(test_x.to(self.device))
-            else:
-                batch_x_feat = test_x.to(self.device)
-            ood_scores = self.ood_predict(batch_x_feat)
-            end = start + ood_scores.shape[0]
-            scores[start:end] = ood_scores
-            labels[start:end] = test_y.squeeze()
-            start = end
-
-        return scores, labels
-
-    @torch.no_grad()
-    def fit_batch(self, batch_x, batch_y):
+    def fit_batch(self, batch_x, batch_y, ncm_update):
         # fit NCM one example at a time
         for x, y in zip(batch_x, batch_y):
-            self.fit(x.cpu(), y.view(1, ), None)
+            self.fit(x.cpu(), y.view(1, ), ncm_update)
 
 # ResNet
 def conv3x3(in_planes, out_planes, stride=1):
@@ -240,15 +221,15 @@ class ResNet(nn.Module):
         out = out.view(out.size(0), -1)
         return out
 
-    def logits(self, x, y):
-        self.ncm.fit_batch(x, y)
-        x = self.ncm.predict(x)
+    def logits(self, x, y, ncm_update):
+        self.ncm.fit_batch(x, y, ncm_update)
+        x = self.ncm.predict(x, ncm_update)
         # x = self.ncm.predict(x, return_probas=True)
         return x
 
     def forward(self, x, y, ncm_update):
         out = self.features(x)
-        logit = self.logits(out, y)
+        logit = self.logits(out, y, ncm_update)
         
         return logit
 

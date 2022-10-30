@@ -46,7 +46,6 @@ class SSCL():
         print('Incremental class: Current tasks:', self.current_tasks)
 
 
-    # def learn_batch(self, train_loader, train_dataset, train_dataset_ul, model_dir, val_loader=None):
     def learn_batch(self, train_loader_l, train_loader_ul, model_dir):
 
         print('Optimizer & loss is reset!')
@@ -59,6 +58,9 @@ class SSCL():
             losses = AverageMeter()
             acc = AverageMeter()
             print('Epoch:{0}'.format(epoch+1))
+
+            if epoch+1 == self.config['epoch']:
+                ncm_update = True
     
             # training labeled dataset
             for i, (xl, y)  in enumerate(train_loader_l):
@@ -74,6 +76,8 @@ class SSCL():
 
                 losses.update(loss, y.size(0))
                 acc.update(accuracy(output, y), y.size(0))
+
+            self.model.ncm.init_weights()
             
             print(' * Train Loss {loss.avg:.3f}'.format(loss=losses))
             print(' * Train Acc {acc.avg:.3f}'.format(acc=acc))
