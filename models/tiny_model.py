@@ -33,9 +33,21 @@ class NearestClassMean(nn.Module):
             self.backbone = backbone.eval().to(device)
 
         # setup weights for NCM
-        self.muK = torch.zeros((self.num_classes, input_shape)).to(self.device)
-        self.cK = torch.zeros(self.num_classes).to(self.device)
-        self.num_updates = 0
+        self.temp_muK = torch.zeros((self.num_classes, self.in_features)).to(self.device)
+        self.temp_cK = torch.zeros(self.num_classes).to(self.device)
+
+        self.muK = torch.zeros((self.num_classes, self.in_features)).to(self.device) # class mean
+        self.cK = torch.zeros(self.num_classes).to(self.device) # class count
+
+    @torch.no_grad()
+    def init_weights(self, x, y):
+        self.temp_muK = torch.zeros((self.num_classes, self.in_features)).to(self.device)
+        self.temp_cK = torch.zeros(self.num_classes).to(self.device)
+
+    @torch.no_grad()
+    def update_weights(self, x, y):
+        self.muK[y, :] += (x - self.muK[y, :]) / (self.cK[y] + 1).unsqueeze(1)
+        self.cK[y] += 1
 
     @torch.no_grad()
     def fit(self, x, y, item_ix):
@@ -58,9 +70,8 @@ class NearestClassMean(nn.Module):
             y = y.unsqueeze(0)
 
         # update class means
-        self.muK[y, :] += (x - self.muK[y, :]) / (self.cK[y] + 1).unsqueeze(1)
-        self.cK[y] += 1
-        self.num_updates += 1
+        self.temp_muK[y, :] += (x - self.temp_muK[y, :]) / (self.temp_cK[y] + 1).unsqueeze(1)
+        self.temp_cK[y] += 1
 
     @torch.no_grad()
     def find_dists(self, A, B):
@@ -131,68 +142,6 @@ class NearestClassMean(nn.Module):
         # fit NCM one example at a time
         for x, y in zip(batch_x, batch_y):
             self.fit(x.cpu(), y.view(1, ), None)
-
-    @torch.no_grad()
-    def train_(self, train_loader):
-        # print('\nTraining on %d images.' % len(train_loader.dataset))
-
-        for batch_x, batch_y, batch_ix in train_loader:
-            if self.backbone is not None:
-                batch_x_feat = self.backbone(batch_x.to(self.device))
-            else:
-                batch_x_feat = batch_x.to(self.device)
-
-            self.fit_batch(batch_x_feat, batch_y, batch_ix)
-
-    @torch.no_grad()
-    def evaluate_(self, test_loader):
-        print('\nTesting on %d images.' % len(test_loader.dataset))
-
-        num_samples = len(test_loader.dataset)
-        probabilities = torch.empty((num_samples, self.num_classes))
-        labels = torch.empty(num_samples).long()
-        start = 0
-        for test_x, test_y in test_loader:
-            if self.backbone is not None:
-                batch_x_feat = self.backbone(test_x.to(self.device))
-            else:
-                batch_x_feat = test_x.to(self.device)
-            probas = self.predict(batch_x_feat, return_probas=True)
-            end = start + probas.shape[0]
-            probabilities[start:end] = probas
-            labels[start:end] = test_y.squeeze()
-            start = end
-        return probabilities, labels
-
-    def save_model(self, save_path, save_name):
-        """
-        Save the model parameters to a torch file.
-        :param save_path: the path where the model will be saved
-        :param save_name: the name for the saved file
-        :return:
-        """
-        # grab parameters for saving
-        d = dict()
-        d['muK'] = self.muK.cpu()
-        d['cK'] = self.cK.cpu()
-        d['num_updates'] = self.num_updates
-
-        # save model out
-        torch.save(d, os.path.join(save_path, save_name + '.pth'))
-
-    def load_model(self, save_file):
-        """
-        Load the model parameters into StreamingLDA object.
-        :param save_path: the path where the model is saved
-        :param save_name: the name of the saved file
-        :return:
-        """
-        # load parameters
-        print('\nloading ckpt from: %s' % save_file)
-        d = torch.load(os.path.join(save_file))
-        self.muK = d['muK'].to(self.device)
-        self.cK = d['cK'].to(self.device)
-        self.num_updates = d['num_updates']
 
 # ResNet
 def conv3x3(in_planes, out_planes, stride=1):
@@ -293,13 +242,14 @@ class ResNet(nn.Module):
 
     def logits(self, x, y):
         self.ncm.fit_batch(x, y)
-        # x = self.ncm.predict(x, return_probas=True)
         x = self.ncm.predict(x)
+        # x = self.ncm.predict(x, return_probas=True)
         return x
 
-    def forward(self, x, y):
+    def forward(self, x, y, ncm_update):
         out = self.features(x)
         logit = self.logits(out, y)
+        
         return logit
 
     def ood_logits(self, feature, yul):
@@ -332,10 +282,16 @@ class ResNet(nn.Module):
 
         if torch.Tensor.dim(feature) < 2:
             self.ncm.fit_batch(xb, yb)
+            out = self.ncm.predict(xb)
+            target = yb
         else:
             ood_x = torch.cat([feature, xb])
             ood_y = torch.cat([yul, yb])
             self.ncm.fit_batch(ood_x, ood_y)
+            out = self.ncm.predict(xb)
+            target = ood_y
+
+        return out, target
 
 
 def Reduced_ResNet18(num_classes=100, nf=20, bias=True, threshold=0.1, device='cuda:0'):

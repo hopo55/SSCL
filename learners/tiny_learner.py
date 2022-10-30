@@ -16,8 +16,8 @@ class SSCL():
         self.current_tasks = 0
 
         self.first_tasks = True
-        # num_classes = self.config['num_task']
-        num_classes = self.config['num_classes']
+        num_classes = self.config['num_task']
+        # num_classes = self.config['num_classes']
         threshold = self.config['threshold']
 
         self.model = models.__dict__[self.config['model_type']].__dict__[self.config['model_name']](num_classes=num_classes, threshold=threshold, device=self.device)
@@ -52,6 +52,8 @@ class SSCL():
         print('Optimizer & loss is reset!')
         optimizer = torch.optim.SGD(self.model.parameters(), lr=self.config['lr'], momentum=self.config['momentum'], weight_decay=self.config['weight_decay'])
 
+        ncm_update = False
+
         for epoch in range(self.config['epoch']):
             self.model.train()
             losses = AverageMeter()
@@ -62,7 +64,7 @@ class SSCL():
             for i, (xl, y)  in enumerate(train_loader_l):
                 xl, y = xl.to(self.device), y.to(self.device)
 
-                output = self.model.forward(xl, y).to(self.device)
+                output = self.model.forward(xl, y, ncm_update).to(self.device)
                 loss = self.criterion(output, y)
 
                 optimizer.zero_grad()
@@ -92,13 +94,11 @@ class SSCL():
         for i, (xul, yul)  in enumerate(train_loader_ul):
             xul, yul = xul.to(self.device), yul.to(self.device)
 
-            self.model.ood_update(xul, yul, self.buffer_x, self.buffer_y)
-            
-            ood_output = self.model.forward(xul, yul).to(self.device)
-            ool_loss = self.ood_criterion(ood_output, yul)
+            ood_output, ood_target = self.model.ood_update(xul, yul, self.buffer_x, self.buffer_y)
+            ool_loss = self.ood_criterion(ood_output, ood_target)
 
-            ood_losses.update(ool_loss, yul.size(0))
-            ood_acc.update(accuracy(ood_output, yul), yul.size(0))
+            ood_losses.update(ool_loss, ood_target.size(0))
+            ood_acc.update(accuracy(ood_output, ood_target), ood_target.size(0))
             
         print(' * Train OOD Loss {loss.avg:.3f}'.format(loss=ood_losses))
         print(' * Train OOD Acc {acc.avg:.3f}'.format(acc=ood_acc))

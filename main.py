@@ -101,15 +101,7 @@ def run(args):
         model_save_dir = args.log_dir + '/models/task-'+task_names[i]+'/'
         if not os.path.exists(model_save_dir): os.makedirs(model_save_dir)
 
-        ## Weighted Loss Functions
-        # unique_idx = np.unique(train_dataset.current_targets)
-        # weight = torch.zeros(num_classes)
-        # weight[unique_idx] = 1
-        # weight = weight.to('cuda:' + str(args.device))
-        # criterion = torch.nn.CrossEntropyLoss(weight=weight)
-
         learner.add_valid_output_dim(out_dim_add)
-        # learner.learn_batch(train_loader_l, train_loader_ul, criterion, model_save_dir)
         learner.learn_batch(train_loader_l, train_loader_ul, model_save_dir)
 
         learner.validatioin(test_loader)
@@ -140,10 +132,10 @@ if __name__ == '__main__':
     # SSCL Args
     parser.add_argument('--class_type', type=str, default='super', help="vanilla|super")
     parser.add_argument('--rand_split', default=False, action='store_true', help="Randomize the classes in splits")
-    parser.add_argument('--batch_size', type=int, default=8)
+    parser.add_argument('--batch_size', type=int, default=2)
     parser.add_argument('--learner_type', type=str, default='tiny_learner', help="The type (filename) of learner")
     parser.add_argument('--learner_name', type=str, default='SSCL', help="The class name of learner")
-    parser.add_argument('--ul_batch_size', type=int, default=16)
+    parser.add_argument('--ul_batch_size', type=int, default=2)
     parser.add_argument('--labeled_samples', type=int, default=500, help='Number of labeled samples each task in ssl')
     parser.add_argument('--unlabeled_task_samples', type=int, default=-1, help='Number of unlabeled samples in each task in ssl')
 
