@@ -61,16 +61,14 @@ class SSCL():
 
             if epoch+1 == self.config['epoch']:
                 ncm_update = True
+
+            print("Training Labeled Dataset")
     
             # training labeled dataset
             for i, (xl, y)  in enumerate(train_loader_l):
                 xl, y = xl.to(self.device), y.to(self.device)
 
                 output = self.model.forward(xl, y, ncm_update).to(self.device)
-                # print("=================config=================")
-                # print(output)
-                # print(y)
-                # print("========================================")
                 loss = self.criterion(output, y)
 
                 optimizer.zero_grad()
@@ -92,8 +90,10 @@ class SSCL():
 
         # Update replay buffer (only first task new train dataset)
         if self.first_tasks:
+            print("Buffer Initialization")
             self.update_buffer(train_loader_l)
 
+        print("Training OOD Model")
         # Fine-tuning NCM using unlabed dataset(pseudo label) and replay buffer
         self.model.eval()
         ood_losses = AverageMeter()
@@ -118,6 +118,7 @@ class SSCL():
 
         # Update replay buffer (exist buffer and new train dataset)
         if not self.first_tasks:
+            print("Update Buffer")
             self.update_buffer(train_loader_ul, self.first_tasks)
 
         self.first_tasks = False
