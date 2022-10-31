@@ -1,1 +1,1 @@
-from . import tiny_model
+from . import tiny_model, resnet, mobilenet, ncm

@@ -1,7 +1,6 @@
 #!/usr/bin/bash
 DEVICE=2
 WORKERS=8
-# MODEL_NAME='ResNet18'Reduced_ResNet18
 MODEL_NAME='Reduced_ResNet18'
 EPOCH=30
 THRESHOLD=0.5
