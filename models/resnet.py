@@ -103,7 +103,8 @@ class ResNet(nn.Module):
 
     def logits(self, x, y, ncm_update):
         self.ncm.fit_batch(x, y, ncm_update)
-        x = self.ncm.predict(x, ncm_update=ncm_update, return_probas=True)
+        x = self.ncm.predict(x, ncm_update=ncm_update)
+        # x = self.ncm.predict(x, ncm_update=ncm_update, return_probas=True)
 
         return x
 
@@ -136,6 +137,12 @@ class ResNet(nn.Module):
 
         return feature, out
 
+    def pseudo_labeling(self, xul, yul):
+        feature = self.features(xul)
+        feature, pu_yul = self.ood_logits(feature, yul) # pseduo-labeling and filtering noisy data
+
+        return feature, pu_yul
+
     # update center
     def ood_update(self, xul, yul, xb, yb):
         feature = self.features(xul)
@@ -143,13 +150,19 @@ class ResNet(nn.Module):
 
         if torch.Tensor.dim(feature) < 2:
             self.ncm.fit_batch(xb, yb, ncm_update=True)
-            out = self.ncm.predict(xb, ncm_update=True, return_probas=True)
+            out = self.ncm.predict(xb, ncm_update=True)
             target = yb
         else:
             ood_x = torch.cat([feature, xb])
             ood_y = torch.cat([yul, yb])
             self.ncm.fit_batch(ood_x, ood_y, ncm_update=True)
-            out = self.ncm.predict(ood_x, ncm_update=True, return_probas=True)
+            out = self.ncm.predict(ood_x, ncm_update=True)
             target = ood_y
 
         return out, target.squeeze(dim=-1)
+
+    def validatioin(self, x):
+        feature = self.features(x)
+        out = self.ncm.predict(feature, ncm_update=True)
+
+        return out

@@ -95,13 +95,16 @@ class SSCL():
 
         print("Training OOD Model")
         # Fine-tuning NCM using unlabed dataset(pseudo label) and replay buffer
-        self.model.eval()
+        self.model.train()
+        # self.model.eval()
         ood_losses = AverageMeter()
         ood_acc = AverageMeter()
         
+        # with torch.no_grad():
         for i, (xul, yul)  in enumerate(train_loader_ul):
             xul, yul = xul.to(self.device), yul.to(self.device)
 
+            # pseudo-labeling
             ood_output, ood_target = self.model.ood_update(xul, yul, self.buffer_x, self.buffer_y)
             ood_output = ood_output.to(self.device)
             ool_loss = self.ood_criterion(ood_output, ood_target)
@@ -198,7 +201,7 @@ class SSCL():
             for x, y  in test_loader:
                 x, y = x.to(self.device), y.to(self.device)
 
-                _, output = self.model.predict(x)
+                output = self.model.validatioin(x)
                 val_acc.update(accuracy(output.to(self.device), y), y.size(0))
 
             print(' * Validation Acc {acc.avg:.3f}'.format(acc=val_acc))

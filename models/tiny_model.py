@@ -1,7 +1,7 @@
 from models.resnet import ResNet, BasicBlock
 from models.mobilenet import MobileNetV2
 
-def Reduced_ResNet18(num_classes=20, nf=20, bias=True, threshold=0.1, device='cuda:0'):
+def Reduced_ResNet18(num_classes=20, nf=20, bias=True, threshold=0.5, device='cuda:0'):
     # Reduced ResNet18 as in GEM MIR(note that nf=20).
     return ResNet(BasicBlock, [2, 2, 2, 2], num_classes, nf, bias, threshold, device)
 
